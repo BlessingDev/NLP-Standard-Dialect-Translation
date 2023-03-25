@@ -76,7 +76,7 @@ class NMTDataset(Dataset):
             vectorizer_filepath (str): Vectorizer 객체의 저장 위치
         """
         with open(vectorizer_filepath, "w") as fp:
-            json.dump(self._vectorizer.to_serializable(), fp)
+            json.dump(self._vectorizer.to_serializable(), fp, ensure_ascii=False)
 
     def get_vectorizer(self):
         """ 벡터 변환 객체를 반환합니다 """

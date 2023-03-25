@@ -8,7 +8,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 import os
-import tqdm
+import tqdm.cli as tqdm
 
 def set_seed_everywhere(seed, cuda):
     np.random.seed(seed)
@@ -109,7 +109,7 @@ def sequence_loss(y_pred, y_true, mask_index):
     y_pred, y_true = normalize_sizes(y_pred, y_true)
     return F.cross_entropy(y_pred, y_true, ignore_index=mask_index)
 
-def init_model_and_dataset(args:Namespace) -> tuple(NMTDataset, NMTVectorizer, NMTModel):
+def init_model_and_dataset(args:Namespace) -> tuple:
     data_set = None
 
     if args.reload_from_files and os.path.exists(args.vectorizer_file):
@@ -142,15 +142,15 @@ def main():
     args = Namespace(dataset_csv="datas/output/jeonla_dialect_integration.csv",
                  vectorizer_file="vectorizer.json",
                  model_state_file="model.pth",
-                 save_dir="model_storage/dial-stan_1",
+                 save_dir="model_storage/dial-stan_2",
                  reload_from_files=True,
                  expand_filepaths_to_save_dir=True,
                  cuda=True,
                  seed=1337,
                  learning_rate=5e-4,
                  batch_size=16,
-                 num_epochs=100,
-                 early_stopping_criteria=5,              
+                 num_epochs=50,
+                 early_stopping_criteria=3,              
                  source_embedding_size=64, 
                  target_embedding_size=64,
                  encoding_size=64,
@@ -194,17 +194,17 @@ def main():
     mask_index = vectorizer.target_vocab.mask_index
     train_state = make_train_state(args) 
 
-    epoch_bar = tqdm.notebook.tqdm(desc='training routine', 
+    epoch_bar = tqdm.tqdm(desc='training routine', 
                                 total=args.num_epochs,
                                 position=0)
 
     data_set.set_split('train')
-    train_bar = tqdm.notebook.tqdm(desc='split=train',
+    train_bar = tqdm.tqdm(desc='split=train',
                                 total=data_set.get_num_batches(args.batch_size), 
                                 position=1, 
                                 leave=True)
     data_set.set_split('val')
-    val_bar = tqdm.notebook.tqdm(desc='split=val',
+    val_bar = tqdm.tqdm(desc='split=val',
                                 total=data_set.get_num_batches(args.batch_size), 
                                 position=1, 
                                 leave=True)
