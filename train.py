@@ -1,13 +1,13 @@
-from torch.nn import functional as F
 from argparse import Namespace
 from dataset import NMTDataset, generate_nmt_batches
 from model import NMTModel
-from vectorizer import NMTVectorizer
+from metric import *
 
 import torch
 import torch.optim as optim
 import numpy as np
 import os
+import json
 import tqdm.cli as tqdm
 
 def set_seed_everywhere(seed, cuda):
@@ -75,39 +75,9 @@ def update_train_state(args, model, train_state):
         train_state['stop_early'] = \
             train_state['early_stopping_step'] >= args.early_stopping_criteria
 
+    save_train_state(train_state, args)
+
     return train_state
-
-def normalize_sizes(y_pred, y_true):
-    """텐서 크기 정규화
-    
-    매개변수:
-        y_pred (torch.Tensor): 모델의 출력
-            3차원 텐서이면 행렬로 변환합니다.
-        y_true (torch.Tensor): 타깃 예측
-            행렬이면 벡터로 변환합니다.
-    """
-    if len(y_pred.size()) == 3:
-        y_pred = y_pred.contiguous().view(-1, y_pred.size(2))
-    if len(y_true.size()) == 2:
-        y_true = y_true.contiguous().view(-1)
-    return y_pred, y_true
-
-def compute_accuracy(y_pred, y_true, mask_index):
-    y_pred, y_true = normalize_sizes(y_pred, y_true)
-
-    _, y_pred_indices = y_pred.max(dim=1)
-    
-    correct_indices = torch.eq(y_pred_indices, y_true).float()
-    valid_indices = torch.ne(y_true, mask_index).float()
-    
-    n_correct = (correct_indices * valid_indices).sum().item()
-    n_valid = valid_indices.sum().item()
-
-    return n_correct / n_valid * 100
-
-def sequence_loss(y_pred, y_true, mask_index):
-    y_pred, y_true = normalize_sizes(y_pred, y_true)
-    return F.cross_entropy(y_pred, y_true, ignore_index=mask_index)
 
 def init_model_and_dataset(args:Namespace) -> tuple:
     data_set = None
@@ -120,6 +90,8 @@ def init_model_and_dataset(args:Namespace) -> tuple:
         # 데이터셋과 Vectorizer를 만듭니다.
         data_set = NMTDataset.load_dataset_and_make_vectorizer(args.dataset_csv)
         data_set.save_vectorizer(args.vectorizer_file)
+
+    vectorizer = data_set.get_vectorizer()
 
     vectorizer = data_set.get_vectorizer()
 
@@ -138,23 +110,28 @@ def init_model_and_dataset(args:Namespace) -> tuple:
     
     return data_set, vectorizer, model
 
+def save_train_state(train_state, args):
+    with open(args.train_state_file, "wt", encoding="utf-8") as fp:
+        json.dump(train_state, fp)
+
 def main():
     args = Namespace(dataset_csv="datas/output/jeonla_dialect_integration.csv",
-                 vectorizer_file="vectorizer.json",
-                 model_state_file="model.pth",
-                 save_dir="model_storage/dial-stan_2",
-                 reload_from_files=True,
-                 expand_filepaths_to_save_dir=True,
-                 cuda=True,
-                 seed=1337,
-                 learning_rate=5e-4,
-                 batch_size=16,
-                 num_epochs=50,
-                 early_stopping_criteria=3,              
-                 source_embedding_size=64, 
-                 target_embedding_size=64,
-                 encoding_size=64,
-                 catch_keyboard_interrupt=True)
+                vectorizer_file="vectorizer.json",
+                model_state_file="model.pth",
+                train_state_file="train_state.json",
+                save_dir="model_storage/dial-stan_2",
+                reload_from_files=True,
+                expand_filepaths_to_save_dir=True,
+                cuda=True,
+                seed=1337,
+                learning_rate=5e-4,
+                batch_size=24,
+                num_epochs=50,
+                early_stopping_criteria=3,              
+                source_embedding_size=64, 
+                target_embedding_size=64,
+                encoding_size=64,
+                catch_keyboard_interrupt=True)
 
     # console argument 구성 및 받아오기
 
@@ -165,9 +142,13 @@ def main():
         args.model_state_file = os.path.join(args.save_dir,
                                             args.model_state_file)
         
+        args.train_state_file = os.path.join(args.save_dir,
+                                            args.train_state_file)
+        
         print("파일 경로: ")
         print("\t{}".format(args.vectorizer_file))
         print("\t{}".format(args.model_state_file))
+        print("\t{}".format(args.train_state_file))
         
     # CUDA 체크
     if not torch.cuda.is_available():
@@ -192,7 +173,13 @@ def main():
                                             mode='min', factor=0.5,
                                             patience=1)
     mask_index = vectorizer.target_vocab.mask_index
+
     train_state = make_train_state(args) 
+
+    if args.reload_from_files and os.path.exists(args.train_state_file):
+        with open(args.train_state_file, "rt", encoding="utf-8") as fp:
+            train_state = json.load(fp)
+            train_state["learning_rate"] = args.learning_rate
 
     epoch_bar = tqdm.tqdm(desc='training routine', 
                                 total=args.num_epochs,
@@ -211,7 +198,7 @@ def main():
 
     try:
         for epoch_index in range(args.num_epochs):
-            train_state['epoch_index'] = epoch_index
+            train_state['epoch_index'] += 1
 
             # 훈련 세트에 대한 순회
 
@@ -307,6 +294,8 @@ def main():
             epoch_bar.update()
             
     except KeyboardInterrupt:
+        # train state 저장 코드 추가
+        save_train_state(train_state, args)
         print("반복 중지")
 
     

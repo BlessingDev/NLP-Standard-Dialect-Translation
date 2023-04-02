@@ -66,7 +66,7 @@ class NMTDataset(Dataset):
         반환값:
             NMTVectorizer의 인스턴스
         """
-        with open(vectorizer_filepath) as fp:
+        with open(vectorizer_filepath, encoding="utf-8") as fp:
             return NMTVectorizer.from_serializable(json.load(fp))
 
     def save_vectorizer(self, vectorizer_filepath):
@@ -75,7 +75,7 @@ class NMTDataset(Dataset):
         매개변수:
             vectorizer_filepath (str): Vectorizer 객체의 저장 위치
         """
-        with open(vectorizer_filepath, "w") as fp:
+        with open(vectorizer_filepath, "w", encoding="utf-8") as fp:
             json.dump(self._vectorizer.to_serializable(), fp, ensure_ascii=False)
 
     def get_vectorizer(self):
