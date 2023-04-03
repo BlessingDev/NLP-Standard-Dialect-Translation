@@ -35,8 +35,8 @@ def dialect_json_to_df(dir_path):
     return df
 
 def merge_dataset_with_label(train_set_csv: str, test_set_csv: str, val_threshold=0.5) -> pd.DataFrame:
-    train_df = pd.read_csv(train_set_csv, index_col=0)
-    test_df = pd.read_csv(test_set_csv, index_col=0)
+    train_df = pd.read_csv(train_set_csv, index_col=0, encoding="utf-8")
+    test_df = pd.read_csv(test_set_csv, index_col=0, encoding="utf-8")
     print("csv 로드 완료")
 
     train_df["셋"] = ["train"] * len(train_df)
