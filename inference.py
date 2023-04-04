@@ -1,6 +1,6 @@
 from dataset import NMTDataset, generate_nmt_batches
 from model import NMTModel
-from utils import default_args, set_seed_everywhere, get_all_sentences
+from utils import default_args, set_seed_everywhere
 from metric import compute_accuracy, compute_bleu_score
 
 import os
@@ -8,6 +8,8 @@ import argparse
 import json
 import torch
 import tqdm.cli as tqdm
+import cython_code.cvocabulary as cvocabulary
+import cython_code.sentence as sentence
 
 def main():
     parser = argparse.ArgumentParser()
@@ -44,7 +46,7 @@ def main():
     )
 
     args = parser.parse_args()
-    #args = parser.parse_args(["--model_dir", "model_storage/dial-stan_2", "--dataset_path", "datas/output/jeonla_dialect_integration.csv", "--batch_size", "24"])
+    #args = parser.parse_args(["--model_dir", "model_storage/dial-stan_2", "--dataset_path", "datas/output/jeonla_dialect_integration.csv", "--batch_size", "8"])
 
     if not torch.cuda.is_available():
         args.device = "cpu"
@@ -73,6 +75,9 @@ def main():
     
     vectorizer = data_set.get_vectorizer()
     mask_index = vectorizer.target_vocab.mask_index
+    cvocab_target = cvocabulary.SequenceVocabulary.from_serializable(cvocabulary.SequenceVocabulary, vectorizer.target_vocab.to_serializable())
+    cvocab_source = cvocabulary.SequenceVocabulary.from_serializable(cvocabulary.SequenceVocabulary, vectorizer.source_vocab.to_serializable())
+
 
     model = NMTModel(source_vocab_size=len(vectorizer.source_vocab), 
                  source_embedding_size=default_args.source_embedding_size, 
@@ -106,11 +111,14 @@ def main():
             running_acc += (acc_t - running_acc) / (batch_index + 1)
 
             # 출력값을 문장으로 바꾸고 bleu 점수 계산
-
-            for idx in range(args.batch_size):
-                pred = y_pred.detach().cpu().data.numpy()[idx]
-                results.append(get_all_sentences(vectorizer, batch_dict, pred, idx))
-                    
+            x_sources = batch_dict["x_source"].cpu().data.numpy()
+            y_targets = batch_dict["y_target"].cpu().data.numpy()
+            preds = y_pred.cpu().data.numpy()
+            batch_sentence_result = sentence.batch_sentence(cvocab_source, cvocab_target,
+                                                            x_sources, y_targets, preds,
+                                                            args.batch_size)
+            results.extend(batch_sentence_result)
+            
             # 진행 상태 막대 업데이트
             test_bar.set_postfix(acc=running_acc)
             test_bar.update()

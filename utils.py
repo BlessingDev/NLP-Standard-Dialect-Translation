@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 from argparse import Namespace
+import cython_code.cvocabulary
+import cython_code.sentence as sentence
 
 default_args = Namespace(
                 seed=1337,
@@ -15,13 +17,13 @@ def set_seed_everywhere(seed, cuda):
     if cuda:
         torch.cuda.manual_seed_all(seed)
 
-def get_source_sentence(vectorizer, batch_dict, index):
+# cython으로 옮긴 코드
+'''def get_source_sentence(source_vocab, batch_dict, index):
     indices = batch_dict['x_source'][index].cpu().data.numpy()
-    vocab = vectorizer.source_vocab
-    return sentence_from_indices(indices, vocab)
+    return sentence.sentence_from_indices(indices, source_vocab)
 
-def get_true_sentence(vectorizer, batch_dict, index):
-    return sentence_from_indices(batch_dict['y_target'].cpu().data.numpy()[index], vectorizer.target_vocab)
+def get_true_sentence(target_vocab, batch_dict, index):
+    return sentence.sentence_from_indices(batch_dict['y_target'].cpu().data.numpy()[index], target_vocab)
     
 def get_sampled_sentence(model, vectorizer, batch_dict, index):
     y_pred = model(x_source=batch_dict['x_source'], 
@@ -29,11 +31,13 @@ def get_sampled_sentence(model, vectorizer, batch_dict, index):
                    target_sequence=batch_dict['x_target'])
     return sentence_from_indices(torch.max(y_pred, dim=2)[1].cpu().data.numpy()[index], vectorizer.target_vocab)
 
-def get_all_sentences(vectorizer, batch_dict, pred, index):
+def get_all_sentences(vocab_source, vocab_target, batch_dict, pred, index):
+    #vocab_target = vectorizer.target_vocab
+    #vocab_sorce = vectorizer.source_vocab
     pred_idx = np.argmax(pred, axis=1)
-    return {"source": get_source_sentence(vectorizer, batch_dict, index), 
-            "truth": get_true_sentence(vectorizer, batch_dict, index), 
-            "pred": sentence_from_indices(pred_idx, vectorizer.target_vocab)}
+    return {"source": get_source_sentence(vocab_source, batch_dict, index), 
+            "truth": get_true_sentence(vocab_target, batch_dict, index), 
+            "pred": sentence.sentence_from_indices(pred_idx, vocab_target)}
     
 def sentence_from_indices(indices, vocab, strict=True):
     ignore_indices = set([vocab.mask_index, vocab.begin_seq_index, vocab.end_seq_index])
@@ -47,4 +51,4 @@ def sentence_from_indices(indices, vocab, strict=True):
             out.append(vocab.lookup_index(index))
     
     out_sentence = " ".join(out).replace(" ##", "")
-    return out_sentence
+    return out_sentence'''
