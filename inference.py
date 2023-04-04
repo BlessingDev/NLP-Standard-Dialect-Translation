@@ -1,7 +1,7 @@
 from dataset import NMTDataset, generate_nmt_batches
 from model import NMTModel
 from utils import default_args, set_seed_everywhere, get_all_sentences
-from metric import compute_accuracy, compute_bleu_store
+from metric import compute_accuracy, compute_bleu_score
 
 import os
 import argparse
@@ -115,7 +115,7 @@ def main():
             test_bar.set_postfix(acc=running_acc)
             test_bar.update()
         
-        bleu = compute_bleu_store([row["pred"] for row in results], [row["truth"] for row in results])
+        bleu = compute_bleu_score([row["pred"] for row in results], [row["truth"] for row in results])
         eval_dict = {"acc.": running_acc, "bleu": bleu}
         with open(os.path.join(args.model_dir, "evaluation.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(eval_dict))
@@ -124,7 +124,7 @@ def main():
             fp.write(json.dumps(results))
     
     except KeyboardInterrupt:
-        bleu = compute_bleu_store([row["pred"] for row in results], [row["truth"] for row in results])
+        bleu = compute_bleu_score([row["pred"] for row in results], [row["truth"] for row in results])
         eval_dict = {"acc.": running_acc, "bleu": bleu}
         with open(os.path.join(args.model_dir, "evaluation.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(eval_dict))
