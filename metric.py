@@ -35,7 +35,7 @@ def sequence_loss(y_pred, y_true, mask_index):
     y_pred, y_true = normalize_sizes(y_pred, y_true)
     return F.cross_entropy(y_pred, y_true, ignore_index=mask_index)
 
-def compute_bleu_store(y_pred, y_true, weights=(0.25, 0.25, 0.25, 0.25)):
+def compute_bleu_score(y_pred, y_true, weights=(0.25, 0.25, 0.25, 0.25)):
     return bleu_score.corpus_bleu(list_of_references=[[ref] for ref in y_true], 
                                   hypotheses=y_pred, 
                                   weights=weights,
