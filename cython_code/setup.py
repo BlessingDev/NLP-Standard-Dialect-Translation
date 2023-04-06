@@ -2,10 +2,15 @@ from setuptools import setup, Extension
 import numpy
 from Cython.Build import cythonize
 
-setup(
-    ext_modules=[
-        Extension("sentence", ["sentence.cpp"], include_dirs=[numpy.get_include()])
-    ]
-)
+# python setup.py build_ext --inplace
 
-setup(ext_modules=cythonize(["cvocabulary.py", "sentence.pyx"]))
+extensions = [
+    Extension("sentence", ["sentence.pyx"],
+              include_dirs=[numpy.get_include()]),
+    Extension("cvocab", ["cvocabulary.py"])
+]
+
+setup(
+    name="standard_to_dialect_c_part",
+    ext_modules=cythonize(extensions)
+)
