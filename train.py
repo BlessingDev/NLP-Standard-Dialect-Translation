@@ -1,6 +1,6 @@
 from argparse import Namespace
 from dataset import NMTDataset, generate_nmt_batches
-from model import NMTModel
+from translate_model import NMTModel
 from metric import *
 
 import torch
