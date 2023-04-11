@@ -8,8 +8,8 @@ import argparse
 import json
 import torch
 import tqdm.cli as tqdm
-import cython_code.cvocabulary as cvocabulary
-import cython_code.sentence as sentence
+import cython_module.cvocabulary as cvocabulary
+import cython_module.sentence as sentence
 
 def main():
     parser = argparse.ArgumentParser()

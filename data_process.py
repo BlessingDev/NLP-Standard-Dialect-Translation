@@ -50,7 +50,7 @@ def merge_dataset_with_label(train_set_csv: str, test_set_csv: str, val_threshol
     val_test_df = pd.concat([val_df, test_df])
     res_df = pd.concat([train_df, val_test_df])
 
-    return res_df    
+    return res_df
 
 if __name__ == "__main__":
     print("main")

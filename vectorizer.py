@@ -149,3 +149,111 @@ class NMTVectorizer(object):
                 "target_vocab": self.target_vocab.to_serializable(), 
                 "max_source_length": self.max_source_length,
                 "max_target_length": self.max_target_length}
+
+class TokenLabelingVectorizer(object):
+    """ 어휘 사전을 생성하고 관리합니다 """
+    def __init__(self, vocab, max_length):
+        """
+        매개변수:
+            source_vocab (SequenceVocabulary): 소스 단어를 정수에 매핑합니다
+            target_vocab (SequenceVocabulary): 타깃 단어를 정수에 매핑합니다
+            max_source_length (int): 소스 데이터셋에서 가장 긴 시퀀스 길이
+            max_target_length (int): 타깃 데이터셋에서 가장 긴 시퀀스 길이
+        """
+        self.vocab = vocab
+        
+        self.max_length = max_length
+        
+
+    def _vectorize(self, indices, vector_length=-1, mask_index=0):
+        """인덱스를 벡터로 변환합니다
+        
+        매개변수:
+            indices (list): 시퀀스를 나타내는 정수 리스트
+            vector_length (int): 인덱스 벡터의 길이
+            mask_index (int): 사용할 마스크 인덱스; 거의 항상 0
+        """
+        if vector_length < 0:
+            vector_length = len(indices)
+        
+        vector = np.zeros(vector_length, dtype=np.int64)
+        vector[:len(indices)] = indices
+        vector[len(indices):] = mask_index
+
+        return vector
+    
+    def _get_indices(self, text):
+        """ 벡터로 변환된 소스 텍스트를 반환합니다
+        
+        매개변수:
+            text (str): 소스 텍스트; 토큰은 공백으로 구분되어야 합니다
+        반환값:
+            indices (list): 텍스트를 표현하는 정수 리스트
+        """
+        indices = [self.vocab.begin_seq_index]
+        if type(text) == str:
+            text = text.split(" ")
+        
+        indices.extend(self.vocab.lookup_token(token) for token in text)
+        indices.append(self.vocab.end_seq_index)
+        return indices
+        
+    def vectorize(self, sentence, use_dataset_max_lengths=True):
+        """ 벡터화된 소스 텍스트와 타깃 텍스트를 반환합니다
+        
+        벡터화된 소스 텍스트는 하나의 벡터입니다.
+        벡터화된 타깃 텍스트는 7장의 성씨 모델링과 비슷한 스타일로 두 개의 벡터로 나뉩니다.
+        각 타임 스텝에서 첫 번째 벡터가 샘플이고 두 번째 벡터가 타깃이 됩니다.
+                
+        매개변수:
+            sentence (str): 라벨링할 방언 텍스트
+            use_dataset_max_lengths (bool): 최대 벡터 길이를 사용할지 여부
+        반환값:
+            다음과 같은 키에 벡터화된 데이터를 담은 딕셔너리: 
+                x_vector
+        """
+        sen_vector_length = -1
+        
+        if use_dataset_max_lengths:
+            sen_vector_length = self.max_length + 2
+        
+        indices = self._get_indices(sentence)
+        sentence_vector = self._vectorize(indices, 
+                                        vector_length=sen_vector_length, 
+                                        mask_index=self.vocab.mask_index)
+        
+        return {"x_source": sentence_vector}
+        
+    @classmethod
+    def from_json_list(cls, json_list:list):
+        """ 데이터셋 데이터프레임으로 NMTVectorizer를 초기화합니다
+        
+        매개변수:
+            json_list (list): 텍스트 데이터셋
+        반환값
+        :
+            TokenLabelingVectorizer 객체
+        """
+        vocab = SequenceVocabulary()
+        
+        max_source_length = 0
+
+        for row in json_list:
+            source_tokens = row["tokens"]
+            if len(source_tokens) > max_source_length:
+                max_source_length = len(source_tokens)
+            for token in source_tokens:
+                vocab.add_token(token)
+            
+        return cls(vocab, max_source_length)
+
+    @classmethod
+    def from_serializable(cls, contents):
+        source_vocab = SequenceVocabulary.from_serializable(contents["vocab"])
+        
+        return cls(vocab=source_vocab,
+                   max_length=contents["max_length"])
+
+    def to_serializable(self):
+        return {"vocab": self.vocab.to_serializable(), 
+                "max_length": self.max_length}
