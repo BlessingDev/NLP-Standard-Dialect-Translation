@@ -16,10 +16,15 @@ p::dict ObjectToDict(PyObject*);
 
 void InitBoostPython()
 {
-    std::cout << "Init boost python" << std::endl;
+    //std::cout << "Init boost python" << std::endl;
 
     Py_Initialize();
     np::initialize();
+}
+
+void SetSeed(int s)
+{
+    torch::manual_seed(s);
 }
 
 bool IsCudaAvailable()
@@ -39,7 +44,7 @@ bool ExistFile(std::string& name)
 
 void* InitModel(PyObject* args_pointer)
 {
-    std::cout << "Init Model" << std::endl;
+    //std::cout << "Init Model" << std::endl;
 
     p::dict args_dict = ObjectToDict(args_pointer);
 
@@ -75,7 +80,7 @@ void* InitModel(PyObject* args_pointer)
         std::cout << "new model" << std::endl;
     }
 
-    std::cout << "model init with device " << device << std::endl;
+    //std::cout << "model init with device " << device << std::endl;
     model->get()->to(devType);
 
     return (void*)model;
@@ -83,7 +88,7 @@ void* InitModel(PyObject* args_pointer)
 
 void FreeModel(void* model_void)
 {
-    std::cout << "Free Model" << std::endl;
+    //std::cout << "Free Model" << std::endl;
     TokenLabelingModel* model = (TokenLabelingModel*)model_void;
 
     delete model;
@@ -91,12 +96,10 @@ void FreeModel(void* model_void)
 
 void SaveModel(void* model_pointer, std::string model_path)
 {
-    std::cout << "Save Model" << std::endl;
+    //std::cout << "Save Model" << std::endl;
 
     TokenLabelingModel* model = (TokenLabelingModel*)model_pointer;
 
-    torch::serialize::OutputArchive saveOpt;
-    saveOpt.save_to(model_path);
     torch::save((*model), model_path);
 }
 
@@ -161,7 +164,7 @@ np::ndarray ObjectToNdarray(PyObject* obj_pointer)
 
 p::list ObjectToList(PyObject* obj_pointer)
 {
-    std::cout << "object to list" << std::endl;
+    //std::cout << "object to list" << std::endl;
     p::handle<> handle(p::borrowed(obj_pointer));
     p::object arr_obj(handle);
 
@@ -172,7 +175,7 @@ p::list ObjectToList(PyObject* obj_pointer)
 
 p::dict ObjectToDict(PyObject* obj_pointer)
 {
-    std::cout << "object to dict" << std::endl;
+    //std::cout << "object to dict" << std::endl;
     
     p::handle<> handle(p::borrowed(obj_pointer));
     p::object arr_obj(handle);
@@ -184,7 +187,7 @@ p::dict ObjectToDict(PyObject* obj_pointer)
 
 std::string ObjectToString(PyObject* obj_pointer)
 {
-    std::cout << "object to dict" << std::endl;
+    //std::cout << "object to dict" << std::endl;
     
     p::handle<> handle(p::borrowed(obj_pointer));
     p::object arr_obj(handle);

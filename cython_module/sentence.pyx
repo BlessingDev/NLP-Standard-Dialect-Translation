@@ -22,8 +22,8 @@ def batch_sentence(SequenceVocabulary source_vocab, SequenceVocabulary target_vo
     cdef string true_sentence
     cdef string pred_sentence
     cdef np.ndarray pred_idx
-    cdef map[string, string] m
-    cdef vector[map[string, string]] result_list
+    cdef dict m = dict()
+    cdef list result_list = list()
 
     for i in range(batch_size):
         source_sentence = get_source_sentence(source_vocab, x_sources[i])
@@ -32,10 +32,10 @@ def batch_sentence(SequenceVocabulary source_vocab, SequenceVocabulary target_vo
         pred_sentence = sentence_from_indices(pred_idx, target_vocab)
 
         m.clear()
-        m["source"] = source_sentence
-        m["truth"] = true_sentence
-        m["pred"] = pred_sentence
-        result_list.push_back(m)
+        m["source"] = source_sentence.decode("UTF-8")
+        m["truth"] = true_sentence.decode("UTF-8")
+        m["pred"] = pred_sentence.decode("UTF-8")
+        result_list.append(m)
     
     return result_list
 

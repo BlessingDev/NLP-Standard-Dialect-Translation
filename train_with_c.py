@@ -3,10 +3,12 @@ import ctypes
 import tqdm.cli as tqdm
 import os
 from argparse import Namespace
+import random
 
 import time
 import numpy as np
 import json
+import gc
 from dataset_non_torch import TokenLabelingDataset, generate_labeling_batches_numpy
 
 dll_directories = [
@@ -34,6 +36,7 @@ import cython_module.train_wrapper as tw
 
 def set_seed_everywhere(seed):
     np.random.seed(seed)
+    random.seed(seed)
 
 def handle_dirs(dirpath):
     if not os.path.exists(dirpath):
@@ -52,7 +55,8 @@ def make_train_state(args_dict):
             'test_loss': -1,
             'test_acc': -1,
             'model_filename': args_dict["model_state_file"],
-            "temp_model_file": args_dict["temp_model_file"]}
+            "temp_model_file": args_dict["temp_model_file"],
+            "optimizer_file": args_dict["optimizer_file"]}
 
 def init_dataset(args:dict) -> tuple:
     data_set = None
@@ -86,17 +90,19 @@ def main():
                 model_state_file="model.pth",
                 temp_model_file = "temp_model.pth",
                 train_state_file="train_state.json",
+                optimizer_file="optm.pth",
+                batch_tensor_file="tensor_batch_{data_label}_{batch_num}.npy",
                 save_dir="model_storage/labeling_model_1",
                 reload_from_files=True,
                 expand_filepaths_to_save_dir=True,
                 cuda=True,
-                seed=1337,
+                seed=3029,
                 learning_rate=5e-4,
-                batch_size=24,
-                num_epochs=300,
+                batch_size=96,
+                num_epochs=100,
                 early_stopping_criteria=5,             
                 embedding_size=64,
-                rnn_hidden_size=100,
+                rnn_hidden_size=40,
                 class_num=2,
                 catch_keyboard_interrupt=True)
 
@@ -115,6 +121,12 @@ def main():
         
         args.temp_model_file = os.path.join(args.save_dir,
                                             args.temp_model_file)
+
+        args.batch_tensor_file = os.path.join(args.save_dir,
+                                            args.batch_tensor_file)
+        
+        args.optimizer_file = os.path.join(args.save_dir,
+                                            args.optimizer_file)
         
         print("파일 경로: ")
         print("\t{}".format(args.vectorizer_file))
@@ -147,7 +159,8 @@ def main():
 
     try:
         for epoch_index in range(args.num_epochs):
-            print(f"epoch index {epoch_index}")
+            saved_epoch = train_state["epoch_index"]
+            print(f"epoch index {saved_epoch}")
 
             # 훈련 세트에 대한 순회
 
@@ -176,6 +189,10 @@ def main():
 
             #print(args_dict)
             #print(train_state)
+
+            del train_batch_list
+            del eval_batch_list
+            gc.collect()
 
             if train_state['stop_early']:
                 break

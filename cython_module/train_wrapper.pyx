@@ -33,6 +33,8 @@ cdef extern from "train_util.h":
 
     bool IsCudaAvailable()
 
+    void SetSeed(int)
+
 cdef extern from "train_mini_batch.h":
     cdef void TrainMiniBatch(object, void*, vector[map[string, Tensor]]&) except +
 
@@ -40,8 +42,6 @@ cdef extern from "train_mini_batch.h":
 
 cdef extern from "train_mini_batch.cpp":
     pass
-
-
 
 
 cdef void update_train_state(void* model, dict train_state, dict args):
@@ -86,6 +86,7 @@ def cuda_available():
 # 모든 에폭의 데이터를 한꺼번에 받는다면 에폭 자체를 c에서 돌릴 수 있을 듯
 # ram 용량이 문제가 될 경우 파일로 저장해두고, 경로를 받아서 하나씩 불러가면서 사용할 수 있도록 하면 가능?
 # 다만 파일도 읽고 쓸 때 python 쪽이 훨씬 편하기에 좀 고민되는 부분이 있음
+# -> torch 라이브러리의 save, load 기능을 이용하면 tensor를 그대로 읽고 쓸 수 있을 듯
 def run_epoch(dict args, dict train_state, list train_batch, list eval_batch):
     cdef vector[map[string, Tensor]]* ctrain_batch = NULL
     cdef vector[map[string, Tensor]]* ceval_batch = NULL
@@ -98,6 +99,7 @@ def run_epoch(dict args, dict train_state, list train_batch, list eval_batch):
     # args["test"] = "ref?" reference 확인 완료
     #print("epoch start")
     InitBoostPython()
+    SetSeed(args["seed"])
     
     model_pointer = InitModel(args)
 
@@ -116,6 +118,8 @@ def run_epoch(dict args, dict train_state, list train_batch, list eval_batch):
 
     TrainMiniBatch(train_state, model_pointer, ctrain_batch[0])
 
+    del ctrain_batch
+
     for batch_dict in eval_batch:
         temp_map.clear()
         
@@ -131,6 +135,5 @@ def run_epoch(dict args, dict train_state, list train_batch, list eval_batch):
     SaveModel(model_pointer, args["temp_model_file"].encode())
     update_train_state(model_pointer, train_state, args)
 
-    del ctrain_batch
     del ceval_batch
     FreeModel(model_pointer)

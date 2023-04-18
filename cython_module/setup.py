@@ -32,7 +32,30 @@ extensions = [
                 ])
 ]
 
+train_wrapper_ext = [
+    Extension("train_wrapper", ["train_wrapper.pyx"],
+                include_dirs=[
+                    numpy.get_include(),
+                    "D:\\Libraries\\boost_1_81_0",
+                    "D:\\Libraries\\libtorch\\include",
+                    "D:\\Libraries\\libtorch\\include\\torch\\csrc\\api\\include",
+                    "D:\\Libraries\\tqdm.cpp-master\\include"
+                ],
+                libraries=[
+                    "torch", 
+                    "torch_cuda", 
+                    "caffe2_nvrtc",
+                    "c10", 
+                    "c10_cuda", 
+                    "torch_cpu"
+                ],
+                library_dirs=[
+                    "D:\\Libraries\\libtorch\\lib",
+                    "D:\\Libraries\\boost_1_81_0\\stage\\lib"
+                ])
+]
+
 setup(
     name="cython_module",
-    ext_modules=cythonize(extensions, force=True)
+    ext_modules=cythonize(extensions)
 )

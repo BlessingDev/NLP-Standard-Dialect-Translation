@@ -224,10 +224,10 @@ class TokenLabelingDataset:
         max_seq_length = self._vectorizer.max_length + 2 # begin seq와 end seq 계산
         label_list = np.append([0], label_list)
         label_list = np.append(label_list, np.zeros((max_seq_length - len(label_list)))) # mask index만큼 label 추가
-        encoding = np.eye(self._label_num)[label_list.astype(np.int8)]
+        # encoding = np.eye(self._label_num)[label_list.astype(np.int8)]
 
         return {"x": sentence_vector, 
-                "y_target": encoding}
+                "y_target": label_list}
         
     def get_num_batches(self, batch_size):
         """배치 크기가 주어지면 데이터셋으로 만들 수 있는 배치 개수를 반환합니다
