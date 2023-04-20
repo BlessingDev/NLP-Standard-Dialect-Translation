@@ -1,3 +1,5 @@
 datas/
 __pycache__/
-cython_code/build/
+.vscode/
+cython_module/build/
+model_storage/

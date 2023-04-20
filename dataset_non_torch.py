@@ -1,11 +1,10 @@
-from torch.utils.data import Dataset, DataLoader
-from torch.nn import functional as F
 from vectorizer import *
 
 import pandas as pd
 import json
+from collections import defaultdict
 
-class NMTDataset(Dataset):
+class NMTDataset:
     def __init__(self, text_df, vectorizer):
         """
         매개변수:
@@ -117,8 +116,8 @@ class NMTDataset(Dataset):
         """
         return len(self) // batch_size
 
-class TokenLabelingDataset(Dataset):
-    def __init__(self, json_list:list, vectorizer):
+class TokenLabelingDataset:
+    def __init__(self, json_list:list, vectorizer, label_num):
         """
         매개변수:
             json_list (list): 데이터셋
@@ -126,6 +125,7 @@ class TokenLabelingDataset(Dataset):
         """
         self.data_list = json_list
         self._vectorizer = vectorizer
+        self._label_num = label_num
 
         self.train_list = [row for row in self.data_list if row["셋"] == "train"]
         self.train_size = len(self.train_list)
@@ -143,7 +143,7 @@ class TokenLabelingDataset(Dataset):
         self.set_split('train')
 
     @classmethod
-    def load_dataset_and_make_vectorizer(cls, dataset_json):
+    def load_dataset_and_make_vectorizer(cls, dataset_json, label_num):
         """데이터셋을 로드하고 새로운 Vectorizer를 만듭니다
         
         매개변수:
@@ -156,10 +156,10 @@ class TokenLabelingDataset(Dataset):
             text_list = json.loads(fp.read())
         
         train_subset = [row for row in text_list if row["셋"] == "train"]
-        return cls(text_list, TokenLabelingVectorizer.from_json_list(train_subset))
+        return cls(text_list, TokenLabelingVectorizer.from_json_list(train_subset), label_num)
 
     @classmethod
-    def load_dataset_and_load_vectorizer(cls, dataset_json, vectorizer_filepath):
+    def load_dataset_and_load_vectorizer(cls, dataset_json, vectorizer_filepath, label_num):
         """데이터셋과 새로운 Vectorizer 객체를 로드합니다.
         캐싱된 Vectorizer 객체를 재사용할 때 사용합니다.
         
@@ -174,7 +174,7 @@ class TokenLabelingDataset(Dataset):
             text_list = json.loads(fp.read())
         
         vectorizer = cls.load_vectorizer_only(vectorizer_filepath)
-        return cls(text_list, vectorizer)
+        return cls(text_list, vectorizer, label_num)
 
     @staticmethod
     def load_vectorizer_only(vectorizer_filepath):
@@ -218,13 +218,16 @@ class TokenLabelingDataset(Dataset):
         """
         row = self._target_list[index]
 
-        sentence_vector = self._vectorizer.vectorize(row["tokens"])
+        sentence_vector = self._vectorizer.vectorize(row["tokens"])["x_source"]
         label_list = row["labels"]
 
-        label_t = F.one_hot(label_list, num_classes=2)
+        max_seq_length = self._vectorizer.max_length + 2 # begin seq와 end seq 계산
+        label_list = np.append([0], label_list)
+        label_list = np.append(label_list, np.zeros((max_seq_length - len(label_list)))) # mask index만큼 label 추가
+        # encoding = np.eye(self._label_num)[label_list.astype(np.int8)]
 
         return {"x": sentence_vector, 
-                "y_target": label_t}
+                "y_target": label_list}
         
     def get_num_batches(self, batch_size):
         """배치 크기가 주어지면 데이터셋으로 만들 수 있는 배치 개수를 반환합니다
@@ -239,8 +242,7 @@ class TokenLabelingDataset(Dataset):
 def generate_nmt_batches(dataset, batch_size, shuffle=True, 
                             drop_last=True, device="cpu"):
     """ 파이토치 DataLoader를 감싸고 있는 제너레이터 함수; NMT 버전 """
-    dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
-                            shuffle=shuffle, drop_last=drop_last)
+    dataloader = None
 
     for data_dict in dataloader:
         lengths = data_dict['x_source_length'].numpy()
@@ -253,14 +255,25 @@ def generate_nmt_batches(dataset, batch_size, shuffle=True,
 
 def generate_labeling_batches_numpy(dataset, batch_size, shuffle=True,
                                     drop_last=True):
-    dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
-                            shuffle=shuffle, drop_last=drop_last)
+    data_len = len(dataset)
+    dataset_idx = np.arange(len(dataset))
+    np.random.shuffle(dataset_idx)
+    batch_num = int(data_len / batch_size)
+    dataset_idx = dataset_idx[:batch_size * batch_num]
+    dataset_idx = dataset_idx.reshape((batch_num, batch_size))
 
-    batches = []
-    for data_dict in dataloader:
-        out_data_dict = {}
-        for name, tensor in data_dict.items():
-            out_data_dict[name] = data_dict[name].numpy()
-        batches.append(out_data_dict)
-    
-    return batches
+    for batch_idx in range(dataset_idx.shape[0]):
+        batch_indices = dataset_idx[batch_idx, :]
+        out_data_dict = dict() # batch 하나의 dict name: ndarray
+        datas = [dataset[idx] for idx in batch_indices]
+
+        for row in datas:
+            for key, data in row.items():
+                item_list = out_data_dict.get(key, [])
+                item_list.append(data)
+                out_data_dict[key] = item_list
+
+        for key in out_data_dict.keys():
+            out_data_dict[key] = np.asarray(out_data_dict[key], dtype=np.float64)
+
+        yield out_data_dict
