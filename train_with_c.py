@@ -24,13 +24,14 @@ for dir in dll_directories:
                         total=len(dll_files),
                         position=0)
         for dll_file in dll_files:
-            dll_bar.set_postfix(file_name=dll_file.name)
-            dll_bar.update()
             file_path = os.path.join(dir, dll_file.name)
             try:
                 ctypes.WinDLL(file_path, mode=ctypes.RTLD_LOCAL)
             except:
                 print(f"{file_path} loading에서 에러 발생")
+            dll_bar.set_postfix(file_name=dll_file.name)
+            dll_bar.update()
+        dll_bar.close()
 
 import cython_module.train_wrapper as tw
 
@@ -42,33 +43,28 @@ def handle_dirs(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
 
-def make_train_state(args_dict):
+def make_train_state(args):
     return {'stop_early': False,
             'early_stopping_step': 0,
             'early_stopping_best_val': 1e8,
-            'learning_rate': args_dict["learning_rate"],
+            'learning_rate': args.learning_rate,
             'epoch_index': 0,
             'train_loss': [],
             'train_acc': [],
             'val_loss': [],
-            'val_acc': [],
-            'test_loss': -1,
-            'test_acc': -1,
-            'model_filename': args_dict["model_state_file"],
-            "temp_model_file": args_dict["temp_model_file"],
-            "optimizer_file": args_dict["optimizer_file"]}
+            'val_acc': []}
 
-def init_dataset(args:dict) -> tuple:
+def init_dataset(args) -> tuple:
     data_set = None
 
-    if args["reload_from_files"] and os.path.exists(args["vectorizer_file"]):
+    if os.path.exists(args.vectorizer_file):
         # 체크포인트를 로드합니다.
-        data_set = TokenLabelingDataset.load_dataset_and_load_vectorizer(args["dataset_csv"],
-                                                            args["vectorizer_file"], args["class_num"])
+        data_set = TokenLabelingDataset.load_dataset_and_load_vectorizer(args.dataset_csv,
+                                                            args.vectorizer_file, args.class_num)
     else:
         # 데이터셋과 Vectorizer를 만듭니다.
-        data_set = TokenLabelingDataset.load_dataset_and_make_vectorizer(args["dataset_csv"], args["class_num"])
-        data_set.save_vectorizer(args["vectorizer_file"])
+        data_set = TokenLabelingDataset.load_dataset_and_make_vectorizer(args.dataset_csv, args.class_num)
+        data_set.save_vectorizer(args.vectorizer_file)
 
     vectorizer = data_set.get_vectorizer()
     
@@ -84,29 +80,39 @@ def namespace_to_dict(namespace):
         for k, v in vars(namespace).items()
     }
 
+def save_set_to_npy(data_set, split, args):
+    data_set.set_split(split)
+    data_len = len(data_set)
+    datas = [data_set[idx] for idx in range(data_len)]
+
+    out_data_dict = dict()
+    for row in datas:
+        for key, data in row.items():
+            item_list = out_data_dict.get(key, [])
+            item_list.append(data)
+            out_data_dict[key] = item_list
+    
+    for key in out_data_dict.keys():
+        np.save(args.tensor_file.format(split=split, data_label=key), np.asarray(out_data_dict[key], dtype=np.float64))
+
 def main():
     args = Namespace(dataset_csv="datas/output/jeonla_dialect_labeling_integrated.json",
                 vectorizer_file="vectorizer.json",
                 model_state_file="model.pth",
-                temp_model_file = "temp_model.pth",
                 train_state_file="train_state.json",
-                optimizer_file="optm.pth",
-                batch_tensor_file="tensor_batch_{data_label}_{batch_num}.npy",
-                save_dir="model_storage/labeling_model_1",
-                reload_from_files=True,
+                tensor_file="tensor_{split}_{data_label}.npy",
+                save_dir="model_storage/labeling_model_2",
                 expand_filepaths_to_save_dir=True,
-                cuda=True,
+                make_npy_file=False,
                 seed=3029,
                 learning_rate=5e-4,
                 batch_size=96,
                 num_epochs=100,
-                early_stopping_criteria=5,             
+                early_stopping_criteria=5,
                 embedding_size=64,
-                rnn_hidden_size=40,
-                class_num=2,
-                catch_keyboard_interrupt=True)
-
-
+                rnn_hidden_size=100,
+                class_num=2)
+    
     # console argument 구성 및 받아오기
 
     if args.expand_filepaths_to_save_dir:
@@ -119,45 +125,58 @@ def main():
         args.train_state_file = os.path.join(args.save_dir,
                                             args.train_state_file)
         
-        args.temp_model_file = os.path.join(args.save_dir,
-                                            args.temp_model_file)
-
-        args.batch_tensor_file = os.path.join(args.save_dir,
-                                            args.batch_tensor_file)
+        args.tensor_file = os.path.join(args.save_dir,
+                                        args.tensor_file)
         
-        args.optimizer_file = os.path.join(args.save_dir,
-                                            args.optimizer_file)
         
         print("파일 경로: ")
         print("\t{}".format(args.vectorizer_file))
         print("\t{}".format(args.model_state_file))
         print("\t{}".format(args.train_state_file))
-    
-    if not tw.cuda_available():
-        args.cuda = False
 
-    args.device = "cuda" if args.cuda else "cpu"
-    print(f"device: {args.device}")
-
-    args_dict = namespace_to_dict(args)
+    device = "cuda" if tw.cuda_available() else "cpu"
+    print(f"device: {device}")
 
     # 재현성을 위해 시드 설정
-    set_seed_everywhere(args_dict["seed"])
+    set_seed_everywhere(args.seed)
 
     # 디렉토리 처리
-    handle_dirs(args_dict["save_dir"])
+    handle_dirs(args.save_dir)
 
-    data_set, vectorizer = init_dataset(args_dict)
-    args_dict["num_embedding"] = len(vectorizer.vocab)
+    data_set, vectorizer = init_dataset(args)
+    args.num_embedding = len(vectorizer.vocab)
+    args.keys = list(data_set[0].keys())
 
-    train_state = make_train_state(args_dict) 
+    train_state = make_train_state(args) 
 
-    if args.reload_from_files and os.path.exists(args.train_state_file):
+    if os.path.exists(args.train_state_file):
         with open(args.train_state_file, "rt", encoding="utf-8") as fp:
             train_state = json.load(fp)
             train_state["learning_rate"] = args.learning_rate
 
+    if args.make_npy_file:
+        start_time = time.time()
+        save_set_to_npy(data_set, "train", args)
+        save_set_to_npy(data_set, "val", args)
+        end_time = time.time()
+        print(f"셋 준비 소요 시간: {end_time - start_time:.5f} sec")
+
+    del data_set, vectorizer
+    gc.collect()
+
+    args_dict = namespace_to_dict(args)
+
+    args_dict["opt_weight_decay"] = 0.9
+    args_dict["sch_step_size"] = 10
+    args_dict["sch_gamma"] = 0.8
+
     try:
+        tw.run_train(args_dict, train_state, args.keys)
+    except Exception as e:
+        print("cython module crashed")
+        print(e)
+
+    '''try:
         for epoch_index in range(args.num_epochs):
             saved_epoch = train_state["epoch_index"]
             print(f"epoch index {saved_epoch}")
@@ -205,10 +224,7 @@ def main():
     except KeyboardInterrupt:
         # train state 저장 코드 추가
         save_train_state(train_state, args)
-        print("반복 중지")
-    
-    print(train_state)
-    print(args_dict)
+        print("반복 중지")'''
 
     
 
