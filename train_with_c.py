@@ -2,6 +2,7 @@ import pathlib
 import ctypes
 import tqdm.cli as tqdm
 import os
+import datetime
 from argparse import Namespace
 import random
 
@@ -70,8 +71,8 @@ def init_dataset(args) -> tuple:
     
     return data_set, vectorizer
 
-def save_train_state(train_state, args):
-    with open(args.train_state_file, "wt", encoding="utf-8") as fp:
+def save_train_result(train_state, file_path):
+    with open(file_path, "wt", encoding="utf-8") as fp:
         fp.write(json.dumps(train_state))
 
 def namespace_to_dict(namespace):
@@ -99,18 +100,18 @@ def main():
     args = Namespace(dataset_csv="datas/output/jeonla_dialect_labeling_integrated.json",
                 vectorizer_file="vectorizer.json",
                 model_state_file="model.pth",
-                train_state_file="train_state.json",
                 tensor_file="tensor_{split}_{data_label}.npy",
+                log_json_file="logs/train_at_{time}.json",
                 save_dir="model_storage/labeling_model_2",
                 expand_filepaths_to_save_dir=True,
                 make_npy_file=False,
                 seed=3029,
                 learning_rate=5e-4,
-                batch_size=96,
+                batch_size=192,
                 num_epochs=100,
                 early_stopping_criteria=5,
-                embedding_size=64,
-                rnn_hidden_size=100,
+                embedding_size=100,
+                rnn_hidden_size=150,
                 class_num=2)
     
     # console argument 구성 및 받아오기
@@ -122,17 +123,16 @@ def main():
         args.model_state_file = os.path.join(args.save_dir,
                                             args.model_state_file)
         
-        args.train_state_file = os.path.join(args.save_dir,
-                                            args.train_state_file)
-        
         args.tensor_file = os.path.join(args.save_dir,
                                         args.tensor_file)
+        
+        args.log_json_file = os.path.join(args.save_dir,
+                                        args.log_json_file)
         
         
         print("파일 경로: ")
         print("\t{}".format(args.vectorizer_file))
         print("\t{}".format(args.model_state_file))
-        print("\t{}".format(args.train_state_file))
 
     device = "cuda" if tw.cuda_available() else "cpu"
     print(f"device: {device}")
@@ -142,17 +142,13 @@ def main():
 
     # 디렉토리 처리
     handle_dirs(args.save_dir)
+    handle_dirs('/'.join(args.log_json_file.split('/')[:-1]))
 
     data_set, vectorizer = init_dataset(args)
     args.num_embedding = len(vectorizer.vocab)
     args.keys = list(data_set[0].keys())
 
-    train_state = make_train_state(args) 
-
-    if os.path.exists(args.train_state_file):
-        with open(args.train_state_file, "rt", encoding="utf-8") as fp:
-            train_state = json.load(fp)
-            train_state["learning_rate"] = args.learning_rate
+    train_state = make_train_state(args)
 
     if args.make_npy_file:
         start_time = time.time()
@@ -166,67 +162,22 @@ def main():
 
     args_dict = namespace_to_dict(args)
 
-    args_dict["opt_weight_decay"] = 0.9
+    args_dict["opt_weight_decay"] = 0.7
     args_dict["sch_step_size"] = 10
-    args_dict["sch_gamma"] = 0.8
+    args_dict["sch_gamma"] = 0.5
+    args_dict["log_json_file"] = args_dict["log_json_file"].format(
+        time=datetime.datetime.now().strftime("%Y-%m-%d_%H_%M")
+    )
 
     try:
         tw.run_train(args_dict, train_state, args.keys)
     except Exception as e:
         print("cython module crashed")
         print(e)
-
-    '''try:
-        for epoch_index in range(args.num_epochs):
-            saved_epoch = train_state["epoch_index"]
-            print(f"epoch index {saved_epoch}")
-
-            # 훈련 세트에 대한 순회
-
-            # 훈련 세트와 배치 제너레이터 준비, 손실과 정확도를 0으로 설정
-            start_time = time.time()
-            data_set.set_split('train')
-            batch_generator = generate_labeling_batches_numpy(data_set, 
-                                                batch_size=args.batch_size)
-
-            train_batch_list = list(batch_generator)
-            print("train set 로드 완료")
-            
-            # 검증 세트에 대한 순회 
-
-            # 검증 세트와 배치 제너레이터 준비, 손실과 정확도를 0으로 설정
-            data_set.set_split('val')
-            batch_generator = generate_labeling_batches_numpy(data_set, 
-                                                batch_size=args.batch_size)
-            eval_batch_list = list(batch_generator)
-
-            print("eval set 로드 완료")
-            end_time = time.time()
-            print(f"셋 준비 소요 시간: {end_time - start_time:.5f} sec")
-
-            tw.run_epoch(args_dict, train_state, train_batch_list, eval_batch_list)
-
-            #print(args_dict)
-            #print(train_state)
-
-            del train_batch_list
-            del eval_batch_list
-            gc.collect()
-
-            if train_state['stop_early']:
-                break
-            
-            save_train_state(train_state, args)
-            train_state['epoch_index'] += 1
-            end_time = time.time()
-            print(f"epoch 소요 시간: {end_time - start_time:.5f} sec")
-        
-    except KeyboardInterrupt:
-        # train state 저장 코드 추가
-        save_train_state(train_state, args)
-        print("반복 중지")'''
-
     
+    args_dict.update(train_state)
+    save_train_result(args_dict, args_dict["log_json_file"])
+
 
 if __name__ == "__main__":
     main()

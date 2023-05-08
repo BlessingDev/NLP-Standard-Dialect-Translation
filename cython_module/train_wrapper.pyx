@@ -31,7 +31,6 @@ cdef extern from "cpp_source/train_util.h":
 cdef void update_train_state(LabelingTrainer* trainer, dict train_state, dict args):
     cdef double loss_tm1, loss_t, t
     print("update_train_state")
-    print(train_state)
 
     if train_state['epoch_index'] == 0:
         trainer[0].SaveModel()
@@ -168,11 +167,21 @@ def run_train(dict args, dict train_state, list data_keys):
         TensorMapToBatch(train_data_map, train_batch_map, keys_byte, args["batch_size"], True)
 
         trainer[0].TrainBatch(train_batch_map)
+        try:
+            PyErr_CheckSignals() # 키보드 인터럽트 체크
+        except:
+            print("훈련이 interrupt로 인해 종료됨")
+            return
 
         TensorMapToBatch(val_data_map, val_batch_map, keys_byte, args["batch_size"], True)
 
         trainer[0].ValidateBatch(val_batch_map)
-
+        try:
+            PyErr_CheckSignals() # 키보드 인터럽트 체크
+        except:
+            print("훈련이 interrupt로 인해 종료됨")
+            return
+        
         trainer[0].StepEpoch()
 
         end_time = time(NULL)
@@ -188,4 +197,8 @@ def run_train(dict args, dict train_state, list data_keys):
         if train_state['stop_early']:
             break
 
-        PyErr_CheckSignals() # 키보드 인터럽트 체크
+        try:
+            PyErr_CheckSignals() # 키보드 인터럽트 체크
+        except:
+            print("훈련이 interrupt로 인해 종료됨")
+            return

@@ -18,21 +18,23 @@ protected:
 
     p::list t_loss_list;
     p::list v_loss_list;
+
+    int current_epoch;
     std::string model_path;
-    
     torch::Device cur_device;
 
     T model = nullptr;
-
 private:
     virtual void InitModel() = 0;
 
 public:
     Trainer(PyObject* args, PyObject* py_train_state);
 
+    virtual ~Trainer();
+
     virtual void InitTrain() = 0;
 
-    virtual void StepEpoch() = 0;
+    virtual void StepEpoch();
 
     virtual void SaveModel();
 
@@ -46,7 +48,7 @@ public:
 
 template <typename T>
 Trainer<T>::Trainer(PyObject* args, PyObject* py_train_state)
-    : cur_device(torch::kCPU)
+    : cur_device(torch::kCPU), current_epoch(0)
 {
     InitBoostPython();
 
@@ -62,12 +64,23 @@ Trainer<T>::Trainer(PyObject* args, PyObject* py_train_state)
 }
 
 template <typename T>
+Trainer<T>::~Trainer()
+{
+}
+
+template <typename T>
+void Trainer<T>::StepEpoch()
+{
+    current_epoch += 1;
+}
+
+template <typename T>
 void Trainer<T>::SaveModel()
 {
     if(ExistFile(model_path))
     {
-        std::cout << "model overwrite" << std::endl;
-        std::cout << std::remove(model_path.c_str()) << std::endl;
+        //std::cout << "model overwrite" << std::endl;
+        std::remove(model_path.c_str());
     }
 
     torch::save(model, model_path);

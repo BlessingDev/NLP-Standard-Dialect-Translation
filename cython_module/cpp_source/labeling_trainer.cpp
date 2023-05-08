@@ -17,7 +17,7 @@ LabelingTrainer::~LabelingTrainer()
 
 void LabelingTrainer::InitModel()
 {
-    std::cout << "labeling model init" << std::endl;
+    //std::cout << "labeling model init" << std::endl;
 
     int num_embedding = p::extract<int>(args_dict["num_embedding"]);
 
@@ -54,6 +54,7 @@ void LabelingTrainer::InitTrain()
 
 void LabelingTrainer::StepEpoch()
 {
+    Trainer<TokenLabelingModel>::StepEpoch();
     scheduler->step();
 }
 
