@@ -3,13 +3,8 @@
 from libcpp.map cimport map
 from libcpp.string cimport string
 
-cdef extern from "torch/torch.h" namespace "at":
-    cdef cppclass Tensor:
-        pass
-
-cdef extern from "cpp_source/labeling_model.h":
-    cdef cppclass TokenLabelingModel:
-        pass
+from model cimport TokenLabelingModel
+from tensor cimport Tensor
 
 cdef extern from "cpp_source/trainer.h":
     cdef cppclass Trainer[T]:

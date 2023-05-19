@@ -218,13 +218,15 @@ class TokenLabelingDataset(Dataset):
         """
         row = self._target_list[index]
 
-        sentence_vector = self._vectorizer.vectorize(row["tokens"])
+        sentence_vector = self._vectorizer.vectorize(row["tokens"])["x_source"]
         label_list = row["labels"]
 
-        label_t = F.one_hot(label_list, num_classes=2)
+        max_seq_length = self._vectorizer.max_length + 2 # begin seq와 end seq 계산
+        label_list = np.append([0], label_list)
+        label_list = np.append(label_list, np.zeros((max_seq_length - len(label_list)))) # mask index만큼 label 추가
 
         return {"x": sentence_vector, 
-                "y_target": label_t}
+                "y_target": label_list}
         
     def get_num_batches(self, batch_size):
         """배치 크기가 주어지면 데이터셋으로 만들 수 있는 배치 개수를 반환합니다
@@ -264,3 +266,14 @@ def generate_labeling_batches_numpy(dataset, batch_size, shuffle=True,
         batches.append(out_data_dict)
     
     return batches
+
+def generate_labeling_batches(dataset, batch_size, shuffle=True,
+                                    drop_last=True, device="cpu"):
+    dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
+                            shuffle=shuffle, drop_last=drop_last)
+
+    for data_dict in dataloader:
+        out_data_dict = {}
+        for name, tensor in data_dict.items():
+            out_data_dict[name] = data_dict[name].to(device)
+        yield out_data_dict

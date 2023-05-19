@@ -3,6 +3,8 @@
 #include <map>
 #include <string>
 #include <cstdio>
+#include <sstream>
+#include <fstream>
 #include <boost/python.hpp>
 #include <torch/torch.h>
 #include "train_util.h"
@@ -18,6 +20,8 @@ protected:
 
     p::list t_loss_list;
     p::list v_loss_list;
+    p::list t_acc_list;
+    p::list v_acc_list;
 
     int current_epoch;
     std::string model_path;
@@ -55,8 +59,10 @@ Trainer<T>::Trainer(PyObject* args, PyObject* py_train_state)
     args_dict = ObjectToDict(args);
     train_state = ObjectToDict(py_train_state);
 
-    v_loss_list = p::extract<p::list>(train_state["val_loss"]);
-    t_loss_list = p::extract<p::list>(train_state["train_loss"]);
+    v_loss_list = p::extract<p::list>(train_state["loss/val"]);
+    t_loss_list = p::extract<p::list>(train_state["loss/train"]);
+    v_acc_list = p::extract<p::list>(train_state["acc/val"]);
+    t_acc_list = p::extract<p::list>(train_state["acc/train"]);
     model_path = p::extract<std::string>(args_dict["model_state_file"]);
 
     if (torch::cuda::is_available())
@@ -82,8 +88,15 @@ void Trainer<T>::SaveModel()
         //std::cout << "model overwrite" << std::endl;
         std::remove(model_path.c_str());
     }
+    // can write state_dict?
+    std::stringstream stream;
+    torch::save(model, stream);
+    
+    std::ofstream out(model_path, std::ios::binary);
+    out << stream.rdbuf();
+    out.close();
 
-    torch::save(model, model_path);
+    //torch::save(model, model_path);
 }
 
 template <typename T>

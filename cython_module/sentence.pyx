@@ -12,11 +12,11 @@ cimport numpy as np
 
 np.import_array()
 
-cdef extern from "string_util.cpp":
+cdef extern from "cpp_source/string_util.cpp":
     string join(vector[string], string)
     string replace_all(string, string, string)
 
-def batch_sentence(SequenceVocabulary source_vocab, SequenceVocabulary target_vocab, 
+cdef list c_batch_sentence_mt(SequenceVocabulary source_vocab, SequenceVocabulary target_vocab, 
                     np.ndarray x_sources, np.ndarray y_targets, np.ndarray preds, int batch_size):
     cdef string source_sentence
     cdef string true_sentence
@@ -39,7 +39,32 @@ def batch_sentence(SequenceVocabulary source_vocab, SequenceVocabulary target_vo
     
     return result_list
 
-def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
+cdef list c_batch_sentence_tl(SequenceVocabulary vocab, np.ndarray x_sources, np.ndarray y_labels, np.ndarray preds, int batch_size):
+    cdef string source_sentence
+    cdef string true_sentence
+    cdef string pred_sentence
+    cdef np.ndarray pred_idx
+    cdef np.ndarray label_idx
+    cdef dict m = dict()
+    cdef list result_list
+
+    result_list = []
+    for i in range(batch_size):
+        source_sentence = sentence_from_indices(x_sources[i], vocab)
+        label_idx = np.where(y_labels[i]==1)[0]
+        true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab)
+        pred_idx = np.where(preds[i] == 1)[0]
+        pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab)
+
+        m = dict()
+        m["input"] = source_sentence.decode("UTF-8")
+        m["label"] = true_sentence.decode("UTF-8")
+        m["pred"] = pred_sentence.decode("UTF-8")
+        result_list.append(m)
+    
+    return result_list
+
+cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
     cdef vector[string] out
     cdef string.iterator str_iter
     cdef string out_sentence
@@ -50,14 +75,26 @@ def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool st
             continue
         elif index == vocab.end_seq_index and strict:
             break
+        elif index == vocab.mask_index and strict:
+            break
         else:
-            out.push_back(vocab.lookup_index(index).encode())
+            out.push_back(vocab.lookup_index(index).encode("UTF-8"))
     
     out_sentence = join(out, " ")
 
     out_sentence = replace_all(out_sentence, " ##", "")
     
     return out_sentence
+
+def batch_sentence_mt(SequenceVocabulary source_vocab, SequenceVocabulary target_vocab, 
+                    np.ndarray x_sources, np.ndarray y_targets, np.ndarray preds, int batch_size):
+    return c_batch_sentence_mt(source_vocab, target_vocab, x_sources, y_targets, preds, batch_size)
+
+def batch_sentence_tl(SequenceVocabulary vocab, np.ndarray x_sources, np.ndarray y_labels, np.ndarray preds, int batch_size):
+    return c_batch_sentence_tl(vocab, x_sources, y_labels, preds, batch_size)
+
+def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
+    return c_sentence_from_indices(indices, vocab, strict)
 
 def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):
     return sentence_from_indices(indices, source_vocab)

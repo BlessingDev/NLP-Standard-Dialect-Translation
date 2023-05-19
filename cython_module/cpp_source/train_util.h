@@ -2,15 +2,18 @@
 #define __TRAIN_UTIL_H__
 #include <torch/torch.h>
 #include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 #include <tuple>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <map>
+#include <torch/torch.h>
 #include "labeling_model.h"
 #include "npy.hpp"
 
 namespace p = boost::python;
+namespace np = boost::python::numpy;
 
 p::dict ObjectToDict(PyObject*);
 
@@ -19,12 +22,13 @@ void InitBoostPython()
     //std::cout << "Init boost python" << std::endl;
 
     Py_Initialize();
-    //np::initialize();
+    np::initialize();
 }
 
 void SetSeed(int s)
 {
     torch::manual_seed(s);
+    torch::cuda::manual_seed(s);
 }
 
 at::Tensor LoadNpyToTensor(std::string& file_path)
@@ -59,20 +63,20 @@ void TensorMapToBatch(std::map<std::string, at::Tensor>& tensor_map, std::map<st
     int batch_num = set_size / batch_size;
     int batch_set_size = batch_num * batch_size;
 
-    for (std::string k : keys)
-    {
-        batch_tensor_map[k] = tensor_map[k].slice(0, 0, batch_set_size); // batch 크기에 맞게 drop_last
-    }
-
     if(shuffle)
     {
-        auto rand_idx = torch::randperm(batch_set_size);
+        auto rand_idx = torch::randperm(set_size);
         
         // 텐서를 셔플함
         for (std::string k : keys)
         {
-            batch_tensor_map[k] = batch_tensor_map[k].index({rand_idx});
+            batch_tensor_map[k] = tensor_map[k].index({rand_idx});
         }
+    }
+
+    for (std::string k : keys)
+    {
+        batch_tensor_map[k] = batch_tensor_map[k].slice(0, 0, batch_set_size); // batch 크기에 맞게 drop_last
     }
 
     for (std::string k : keys)
@@ -105,80 +109,54 @@ bool ExistFile(std::string& name)
     }
 }
 
-/*
-void* InitModel(PyObject* args_pointer)
+std::vector<int> GetTensorSize(const at::Tensor& t)
 {
-    //std::cout << "Init Model" << std::endl;
+    auto t_size = t.sizes().vec();
 
-    p::dict args_dict = ObjectToDict(args_pointer);
-
-    int num_embedding = p::extract<int>(args_dict["num_embedding"]);
-
-    int embedding_size = 0;
-    embedding_size = p::extract<int>(args_dict["embedding_size"]);
-
-    int rnn_hidden_size = 0;
-    rnn_hidden_size = p::extract<int>(args_dict["rnn_hidden_size"]);
-
-    int class_num = 0;
-    class_num = p::extract<int>(args_dict["class_num"]);
-
-    TokenLabelingModel* model = new TokenLabelingModel(
-        num_embedding, embedding_size, rnn_hidden_size, class_num
-    );
-    std::string device = p::extract<std::string>(p::str(args_dict["device"]));
-    c10::DeviceType devType = c10::DeviceType::CPU;
-    if(device.compare("cuda") == 0)
-    {
-        devType = c10::DeviceType::CUDA;
-    }
-
-    std::string temp_model_file = p::extract<std::string>(args_dict["temp_model_file"]);
-    if(ExistFile(temp_model_file))
-    {
-        std::cout << "loaded from file" << std::endl;
-        torch::load((*model), temp_model_file);
-    }
-    else
-    {
-        std::cout << "new model" << std::endl;
-    }
-
-    //std::cout << "model init with device " << device << std::endl;
-    model->get()->to(devType);
-
-    return (void*)model;
+    return std::vector<int>(t_size.begin(), t_size.end());
 }
 
-void FreeModel(void* model_void)
+template <typename T>
+p::list toPythonList(std::vector<T>& v)
 {
-    //std::cout << "Free Model" << std::endl;
-    TokenLabelingModel* model = (TokenLabelingModel*)model_void;
-
-    delete model;
-}
-
-void SaveModel(void* model_pointer, std::string model_path)
-{
-    //std::cout << "Save Model" << std::endl;
-
-    TokenLabelingModel* model = (TokenLabelingModel*)model_pointer;
-
-    torch::save((*model), model_path);
-}
-
-std::vector<int> GetNparrSize(np::ndarray& np_arr)
-{
-    std::vector<int> size_vector;
-    int nd = np_arr.get_nd();
-    for (int i = 0; i < nd; i++)
+    p::list l;
+    for (T v_val : v)
     {
-        size_vector.push_back(np_arr.shape(i));
+        l.append(v_val);
     }
 
-    return size_vector;
+    return l;
 }
-*/
+
+PyObject* GetNdarrayFromTensor(at::Tensor& t)
+{
+    t = t.to(c10::DeviceType::CPU, c10::ScalarType::Double);
+    double* tensor_data = t.data_ptr<double>();
+
+    // 1차원 텐서로 리쉐이프
+    // vector 만들기
+    // 출력
+    
+    std::vector<double> dobule_arr(tensor_data, tensor_data + t.ndimension());
+    
+    p::tuple shape(toPythonList(t.sizes().vec()));
+    p::tuple stride = p::make_tuple(sizeof(double));
+    np::dtype double_type = np::dtype::get_builtin<double>();
+
+    p::object own;
+    np::ndarray np_arr = np::from_data(tensor_data, double_type, shape, stride, own);
+
+    return own.ptr();
+}
+
+at::Tensor MakeRandomTensor()
+{
+    at::Tensor t =  torch::rand({2, 3});
+
+    std::cout << t << std::endl;
+
+    return t;
+}
 
 /*
 at::Tensor NdarrayToTensor(np::ndarray& array)

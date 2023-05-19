@@ -13,6 +13,8 @@ private:
     torch::optim::Adam* optimizer = nullptr;
     torch::optim::StepLR* scheduler = nullptr;
 
+    int mask_index;
+
 private:
     virtual void InitModel() override;
 

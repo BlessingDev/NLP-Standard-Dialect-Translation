@@ -1,7 +1,7 @@
 from dataset import NMTDataset, generate_nmt_batches
 from translate_model import NMTModel
 from utils import default_args, set_seed_everywhere
-from metric import compute_accuracy, compute_bleu_score
+from metric import compute_accuracy_mt, compute_bleu_score
 
 import os
 import argparse
@@ -107,14 +107,14 @@ def main():
                             batch_dict['x_source_length'], 
                             batch_dict['x_target'])
 
-            acc_t = compute_accuracy(y_pred, batch_dict['y_target'], mask_index)
+            acc_t = compute_accuracy_mt(y_pred, batch_dict['y_target'], mask_index)
             running_acc += (acc_t - running_acc) / (batch_index + 1)
 
             # 출력값을 문장으로 바꾸고 bleu 점수 계산
             x_sources = batch_dict["x_source"].cpu().data.numpy()
             y_targets = batch_dict["y_target"].cpu().data.numpy()
             preds = y_pred.cpu().data.numpy()
-            batch_sentence_result = sentence.batch_sentence(cvocab_source, cvocab_target,
+            batch_sentence_result = sentence.batch_sentence_mt(cvocab_source, cvocab_target,
                                                             x_sources, y_targets, preds,
                                                             args.batch_size)
             results.extend(batch_sentence_result)

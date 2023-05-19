@@ -117,7 +117,7 @@ class NMTDataset:
         return len(self) // batch_size
 
 class TokenLabelingDataset:
-    def __init__(self, json_list:list, vectorizer, label_num):
+    def __init__(self, json_list:list, vectorizer):
         """
         매개변수:
             json_list (list): 데이터셋
@@ -125,7 +125,6 @@ class TokenLabelingDataset:
         """
         self.data_list = json_list
         self._vectorizer = vectorizer
-        self._label_num = label_num
 
         self.train_list = [row for row in self.data_list if row["셋"] == "train"]
         self.train_size = len(self.train_list)
@@ -143,7 +142,7 @@ class TokenLabelingDataset:
         self.set_split('train')
 
     @classmethod
-    def load_dataset_and_make_vectorizer(cls, dataset_json, label_num):
+    def load_dataset_and_make_vectorizer(cls, dataset_json):
         """데이터셋을 로드하고 새로운 Vectorizer를 만듭니다
         
         매개변수:
@@ -156,10 +155,10 @@ class TokenLabelingDataset:
             text_list = json.loads(fp.read())
         
         train_subset = [row for row in text_list if row["셋"] == "train"]
-        return cls(text_list, TokenLabelingVectorizer.from_json_list(train_subset), label_num)
+        return cls(text_list, TokenLabelingVectorizer.from_json_list(train_subset))
 
     @classmethod
-    def load_dataset_and_load_vectorizer(cls, dataset_json, vectorizer_filepath, label_num):
+    def load_dataset_and_load_vectorizer(cls, dataset_json, vectorizer_filepath):
         """데이터셋과 새로운 Vectorizer 객체를 로드합니다.
         캐싱된 Vectorizer 객체를 재사용할 때 사용합니다.
         
@@ -174,7 +173,7 @@ class TokenLabelingDataset:
             text_list = json.loads(fp.read())
         
         vectorizer = cls.load_vectorizer_only(vectorizer_filepath)
-        return cls(text_list, vectorizer, label_num)
+        return cls(text_list, vectorizer)
 
     @staticmethod
     def load_vectorizer_only(vectorizer_filepath):

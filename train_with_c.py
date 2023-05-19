@@ -50,10 +50,10 @@ def make_train_state(args):
             'early_stopping_best_val': 1e8,
             'learning_rate': args.learning_rate,
             'epoch_index': 0,
-            'train_loss': [],
-            'train_acc': [],
-            'val_loss': [],
-            'val_acc': []}
+            'loss/train': [],
+            'acc/train': [],
+            'loss/val': [],
+            'acc/val': []}
 
 def init_dataset(args) -> tuple:
     data_set = None
@@ -61,10 +61,10 @@ def init_dataset(args) -> tuple:
     if os.path.exists(args.vectorizer_file):
         # 체크포인트를 로드합니다.
         data_set = TokenLabelingDataset.load_dataset_and_load_vectorizer(args.dataset_csv,
-                                                            args.vectorizer_file, args.class_num)
+                                                            args.vectorizer_file)
     else:
         # 데이터셋과 Vectorizer를 만듭니다.
-        data_set = TokenLabelingDataset.load_dataset_and_make_vectorizer(args.dataset_csv, args.class_num)
+        data_set = TokenLabelingDataset.load_dataset_and_make_vectorizer(args.dataset_csv)
         data_set.save_vectorizer(args.vectorizer_file)
 
     vectorizer = data_set.get_vectorizer()
@@ -102,16 +102,16 @@ def main():
                 model_state_file="model.pth",
                 tensor_file="tensor_{split}_{data_label}.npy",
                 log_json_file="logs/train_at_{time}.json",
-                save_dir="model_storage/labeling_model_2",
+                save_dir="model_storage/labeling_model_3",
                 expand_filepaths_to_save_dir=True,
                 make_npy_file=False,
-                seed=3029,
+                seed=5461,
                 learning_rate=5e-4,
                 batch_size=192,
                 num_epochs=100,
                 early_stopping_criteria=5,
-                embedding_size=100,
-                rnn_hidden_size=150,
+                embedding_size=64,
+                rnn_hidden_size=100,
                 class_num=2)
     
     # console argument 구성 및 받아오기
@@ -147,6 +147,7 @@ def main():
     data_set, vectorizer = init_dataset(args)
     args.num_embedding = len(vectorizer.vocab)
     args.keys = list(data_set[0].keys())
+    args.mask_index = vectorizer.vocab.mask_index
 
     train_state = make_train_state(args)
 
@@ -162,12 +163,9 @@ def main():
 
     args_dict = namespace_to_dict(args)
 
-    args_dict["opt_weight_decay"] = 0.7
+    args_dict["opt_weight_decay"] = 0.0
     args_dict["sch_step_size"] = 10
     args_dict["sch_gamma"] = 0.5
-    args_dict["log_json_file"] = args_dict["log_json_file"].format(
-        time=datetime.datetime.now().strftime("%Y-%m-%d_%H_%M")
-    )
 
     try:
         tw.run_train(args_dict, train_state, args.keys)
@@ -175,6 +173,17 @@ def main():
         print("cython module crashed")
         print(e)
     
+    time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M")
+    args_dict["log_json_file"] = args_dict["log_json_file"].format(
+        time=time_str
+    )
+    model_log_name = "model_{time}.pth".format(time=time_str)
+
+    model_log_name = os.path.join(args.save_dir,
+                                model_log_name)
+    os.rename(args.model_state_file, model_log_name)
+    args.model_state_file = model_log_name
+
     args_dict.update(train_state)
     save_train_result(args_dict, args_dict["log_json_file"])
 

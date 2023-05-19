@@ -28,8 +28,22 @@ lib_list = [
 lib_list.extend(lib_file_list([
 ]))
 
-train_wrapper_ext = [
+wrapper_ext = [
     Extension("train_wrapper", ["train_wrapper.pyx"],
+    include_dirs=[
+        numpy.get_include(),
+        "D:/Libraries/boost_1_81_0/",
+        "D:/Libraries/libtorch/include",
+        "D:/Libraries/libtorch/include/torch/csrc/api/include",
+        "D:/Libraries/tqdm.cpp-master/include",
+        "D:/Libraries/libnpy-master/include",
+    ],
+    libraries=lib_list,
+    library_dirs=[
+        "D:/Libraries/libtorch/lib",
+        "D:/Libraries/boost_1_81_0/stage/lib"
+    ]),
+    Extension("inference_wrapper", ["inference_wrapper.pyx"],
     include_dirs=[
         numpy.get_include(),
         "D:/Libraries/boost_1_81_0/",
@@ -49,9 +63,10 @@ extensions = [
     Extension("sentence", ["sentence.pyx"],
               include_dirs=[numpy.get_include()]),
     Extension("cvocabulary", ["cvocabulary.py"]),
-    train_wrapper_ext[0]
+    Extension("cmetric", ["cmetric.pyx"],
+              include_dirs=[numpy.get_include()])
 ]
-
+extensions.extend(wrapper_ext)
 
 setup(
     name="cython_module",

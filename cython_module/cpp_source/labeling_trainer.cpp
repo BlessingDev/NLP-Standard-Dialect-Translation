@@ -1,9 +1,13 @@
 #include "labeling_trainer.h"
+#include <tuple>
+#include "metric.h"
 #include "tqdm/tqdm.h"
 
 LabelingTrainer::LabelingTrainer(PyObject* args, PyObject* train_state)
     : Trainer<TokenLabelingModel>(args, train_state)
 {
+    mask_index = p::extract<int>(args_dict["mask_index"]);
+
     InitModel();
 }
 
@@ -64,6 +68,7 @@ void LabelingTrainer::TrainBatch(std::map<std::string, at::Tensor>& batch_tensor
     model->train();
 
     double running_loss = 0.0f;
+    double running_acc = 0.0f;
 
     auto x_batch = batch_tensor["x"];
     auto target_batch = batch_tensor["y_target"];
@@ -79,11 +84,13 @@ void LabelingTrainer::TrainBatch(std::map<std::string, at::Tensor>& batch_tensor
         auto y_true = target_batch[i];
         y_true = y_true.to(cur_device, c10::ScalarType::Long);
 
-        // std::cout << "prediction"<< std::endl;
         auto y_pred = model->forward(x);
         y_pred = y_pred.permute({0, 2, 1});
-        // std::cout << "pred size: ";
-        // std::cout << y_pred.sizes() << std::endl;
+
+        std::tuple<at::Tensor, at::Tensor> max_res = at::_ops::max_dim::call(y_pred, 1, false);
+        auto pred_idx = std::get<1>(max_res);
+
+        double acc_t = ComputeAccuracy(pred_idx, x, y_true, mask_index);
 
         // std::cout << "true size: " << y_true.sizes() << std::endl;
         auto loss_function = nn::CrossEntropyLoss();
@@ -95,13 +102,15 @@ void LabelingTrainer::TrainBatch(std::map<std::string, at::Tensor>& batch_tensor
 
         // std::cout << "running loss" << std::endl;
         running_loss += (loss.item().toDouble() - running_loss) / (batch_idx + 1);
+        running_acc += (acc_t - running_acc) / (batch_idx + 1);
 
         batch_idx += 1;
     }
 
     t_loss_list.append(running_loss);
+    t_acc_list.append(running_acc);
 
-    std::cout << "current_train_loss: " << running_loss << std::endl;
+    std::cout << "current_train_loss: " << running_loss << " current_train_acc: " << running_acc << std::endl;
 }
 
 void LabelingTrainer::ValidateBatch(std::map<std::string, at::Tensor>& batch_tensor)
@@ -109,6 +118,7 @@ void LabelingTrainer::ValidateBatch(std::map<std::string, at::Tensor>& batch_ten
     model->eval();
 
     double running_loss = 0;
+    double running_acc = 0.0f;
 
     auto x_batch = batch_tensor["x"];
     auto target_batch = batch_tensor["y_target"];
@@ -126,13 +136,20 @@ void LabelingTrainer::ValidateBatch(std::map<std::string, at::Tensor>& batch_ten
 
         auto loss = F::cross_entropy(y_pred, y_true);
 
-        running_loss += (loss.item().toDouble() - running_loss) / (batch_idx + 1);
+        std::tuple<at::Tensor, at::Tensor> max_res = at::_ops::max_dim::call(y_pred, 1, false);
+        auto pred_idx = std::get<1>(max_res);
 
-        // std::cout.flush();
+        double acc_t = ComputeAccuracy(pred_idx, x, y_true, mask_index);
+
+        running_loss += (loss.item().toDouble() - running_loss) / (batch_idx + 1);
+        running_acc += (acc_t - running_acc) / (batch_idx + 1);
+
+        std::cout.flush();
         batch_idx += 1;
     }
-
+    
     v_loss_list.append(running_loss);
+    v_acc_list.append(running_acc);
 
-    std::cout << "current_val_loss: " << running_loss << std::endl;
+    std::cout << "current_val_loss: " << running_loss << " current_val_acc: " << running_acc << std::endl;
 }
