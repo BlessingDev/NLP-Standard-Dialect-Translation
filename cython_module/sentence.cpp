@@ -1246,11 +1246,12 @@ struct __pyx_opt_args_8sentence_c_sentence_from_indices;
 /* "sentence.pxd":19
  * cdef list c_batch_sentence_tl(SequenceVocabulary vocab, np.ndarray x_sources, np.ndarray y_labels, np.ndarray preds, int batch_size)
  * 
- * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=*)             # <<<<<<<<<<<<<<
+ * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=*, bool connect_enable=*)             # <<<<<<<<<<<<<<
  */
 struct __pyx_opt_args_8sentence_c_sentence_from_indices {
   int __pyx_n;
   bool strict;
+  bool connect_enable;
 };
 
 /* "cvocabulary.pxd":7
@@ -2001,6 +2002,7 @@ static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_sentence_pyx[] = "sentence.pyx";
 static const char __pyx_k_source_vocab[] = "source_vocab";
 static const char __pyx_k_target_vocab[] = "target_vocab";
+static const char __pyx_k_connect_enable[] = "connect_enable";
 static const char __pyx_k_batch_sentence_mt[] = "batch_sentence_mt";
 static const char __pyx_k_batch_sentence_tl[] = "batch_sentence_tl";
 static const char __pyx_k_get_true_sentence[] = "get_true_sentence";
@@ -2020,6 +2022,7 @@ static PyObject *__pyx_n_s_batch_sentence_mt;
 static PyObject *__pyx_n_s_batch_sentence_tl;
 static PyObject *__pyx_n_s_batch_size;
 static PyObject *__pyx_n_s_cline_in_traceback;
+static PyObject *__pyx_n_s_connect_enable;
 static PyObject *__pyx_n_s_encode;
 static PyObject *__pyx_n_s_get_source_sentence;
 static PyObject *__pyx_n_s_get_true_sentence;
@@ -2053,7 +2056,7 @@ static PyObject *__pyx_n_s_y_labels;
 static PyObject *__pyx_n_s_y_targets;
 static PyObject *__pyx_pf_8sentence_batch_sentence_mt(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_source_vocab, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_target_vocab, PyArrayObject *__pyx_v_x_sources, PyArrayObject *__pyx_v_y_targets, PyArrayObject *__pyx_v_preds, int __pyx_v_batch_size); /* proto */
 static PyObject *__pyx_pf_8sentence_2batch_sentence_tl(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab, PyArrayObject *__pyx_v_x_sources, PyArrayObject *__pyx_v_y_labels, PyArrayObject *__pyx_v_preds, int __pyx_v_batch_size); /* proto */
-static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObject *__pyx_self, std::vector<int>  __pyx_v_indices, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab, bool __pyx_v_strict); /* proto */
+static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObject *__pyx_self, std::vector<int>  __pyx_v_indices, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab, bool __pyx_v_strict, bool __pyx_v_connect_enable); /* proto */
 static PyObject *__pyx_pf_8sentence_6get_source_sentence(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_source_vocab, PyArrayObject *__pyx_v_indices); /* proto */
 static PyObject *__pyx_pf_8sentence_8get_true_sentence(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_target_vocab, PyArrayObject *__pyx_v_indices); /* proto */
 static PyObject *__pyx_int_1;
@@ -2482,18 +2485,6 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("c_batch_sentence_tl", 0);
 
-  /* "sentence.pyx":48
- *     cdef np.ndarray pred_idx
- *     cdef np.ndarray label_idx
- *     cdef dict m = dict()             # <<<<<<<<<<<<<<
- *     cdef list result_list
- * 
- */
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 48, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_v_m = ((PyObject*)__pyx_t_1);
-  __pyx_t_1 = 0;
-
   /* "sentence.pyx":51
  *     cdef list result_list
  * 
@@ -2511,7 +2502,7 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
  *     result_list = []
  *     for i in range(batch_size):             # <<<<<<<<<<<<<<
  *         source_sentence = sentence_from_indices(x_sources[i], vocab)
- *         label_idx = np.where(y_labels[i]==1)[0]
+ *         label_idx = np.where(y_labels[i] == 1)[0]
  */
   __pyx_t_2 = __pyx_v_batch_size;
   __pyx_t_3 = __pyx_t_2;
@@ -2522,8 +2513,8 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
  *     result_list = []
  *     for i in range(batch_size):
  *         source_sentence = sentence_from_indices(x_sources[i], vocab)             # <<<<<<<<<<<<<<
- *         label_idx = np.where(y_labels[i]==1)[0]
- *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab)
+ *         label_idx = np.where(y_labels[i] == 1)[0]
+ *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab, connect_enable=False)
  */
     __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_sentence_from_indices); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 53, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
@@ -2583,8 +2574,8 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
     /* "sentence.pyx":54
  *     for i in range(batch_size):
  *         source_sentence = sentence_from_indices(x_sources[i], vocab)
- *         label_idx = np.where(y_labels[i]==1)[0]             # <<<<<<<<<<<<<<
- *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab)
+ *         label_idx = np.where(y_labels[i] == 1)[0]             # <<<<<<<<<<<<<<
+ *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab, connect_enable=False)
  *         pred_idx = np.where(preds[i] == 1)[0]
  */
     __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 54, __pyx_L1_error)
@@ -2622,20 +2613,56 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
 
     /* "sentence.pyx":55
  *         source_sentence = sentence_from_indices(x_sources[i], vocab)
- *         label_idx = np.where(y_labels[i]==1)[0]
- *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab)             # <<<<<<<<<<<<<<
+ *         label_idx = np.where(y_labels[i] == 1)[0]
+ *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab, connect_enable=False)             # <<<<<<<<<<<<<<
  *         pred_idx = np.where(preds[i] == 1)[0]
- *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab)
+ *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab, connect_enable=False)
  */
-    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_sentence_from_indices); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_9, __pyx_n_s_sentence_from_indices); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_9);
+    __pyx_t_1 = __Pyx_GetItemInt(((PyObject *)__pyx_v_x_sources), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 1, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_6 = __Pyx_GetItemInt(((PyObject *)__pyx_v_x_sources), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 1, 1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_GetItem(__pyx_t_1, ((PyObject *)__pyx_v_label_idx)); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_5 = __Pyx_PyObject_GetItem(__pyx_t_6, ((PyObject *)__pyx_v_label_idx)); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_GIVEREF(__pyx_t_6);
+    PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_6);
+    __Pyx_INCREF(((PyObject *)__pyx_v_vocab));
+    __Pyx_GIVEREF(((PyObject *)__pyx_v_vocab));
+    PyTuple_SET_ITEM(__pyx_t_1, 1, ((PyObject *)__pyx_v_vocab));
+    __pyx_t_6 = 0;
+    __pyx_t_6 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    if (PyDict_SetItem(__pyx_t_6, __pyx_n_s_connect_enable, Py_False) < 0) __PYX_ERR(0, 55, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_t_1, __pyx_t_6); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_10 = __pyx_convert_string_from_py_std__in_string(__pyx_t_5); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 55, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __pyx_v_true_sentence = __pyx_t_10;
+
+    /* "sentence.pyx":56
+ *         label_idx = np.where(y_labels[i] == 1)[0]
+ *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab, connect_enable=False)
+ *         pred_idx = np.where(preds[i] == 1)[0]             # <<<<<<<<<<<<<<
+ *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab, connect_enable=False)
+ * 
+ */
+    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_n_s_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 56, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_where); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_6 = __Pyx_GetItemInt(((PyObject *)__pyx_v_preds), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 1, 1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 56, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_9 = __Pyx_PyInt_EqObjC(__pyx_t_6, __pyx_int_1, 1, 0); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 56, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_9);
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __pyx_t_6 = NULL;
-    __pyx_t_8 = 0;
     if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_1))) {
       __pyx_t_6 = PyMethod_GET_SELF(__pyx_t_1);
       if (likely(__pyx_t_6)) {
@@ -2643,164 +2670,66 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
         __Pyx_INCREF(__pyx_t_6);
         __Pyx_INCREF(function);
         __Pyx_DECREF_SET(__pyx_t_1, function);
-        __pyx_t_8 = 1;
       }
     }
-    #if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(__pyx_t_1)) {
-      PyObject *__pyx_temp[3] = {__pyx_t_6, __pyx_t_5, ((PyObject *)__pyx_v_vocab)};
-      __pyx_t_9 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_8, 2+__pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 55, __pyx_L1_error)
-      __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-      __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    } else
-    #endif
-    #if CYTHON_FAST_PYCCALL
-    if (__Pyx_PyFastCFunction_Check(__pyx_t_1)) {
-      PyObject *__pyx_temp[3] = {__pyx_t_6, __pyx_t_5, ((PyObject *)__pyx_v_vocab)};
-      __pyx_t_9 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_8, 2+__pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 55, __pyx_L1_error)
-      __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-      __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    } else
-    #endif
-    {
-      __pyx_t_7 = PyTuple_New(2+__pyx_t_8); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 55, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_7);
-      if (__pyx_t_6) {
-        __Pyx_GIVEREF(__pyx_t_6); PyTuple_SET_ITEM(__pyx_t_7, 0, __pyx_t_6); __pyx_t_6 = NULL;
-      }
-      __Pyx_GIVEREF(__pyx_t_5);
-      PyTuple_SET_ITEM(__pyx_t_7, 0+__pyx_t_8, __pyx_t_5);
-      __Pyx_INCREF(((PyObject *)__pyx_v_vocab));
-      __Pyx_GIVEREF(((PyObject *)__pyx_v_vocab));
-      PyTuple_SET_ITEM(__pyx_t_7, 1+__pyx_t_8, ((PyObject *)__pyx_v_vocab));
-      __pyx_t_5 = 0;
-      __pyx_t_9 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_7, NULL); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 55, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    }
-    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __pyx_t_10 = __pyx_convert_string_from_py_std__in_string(__pyx_t_9); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 55, __pyx_L1_error)
+    __pyx_t_5 = (__pyx_t_6) ? __Pyx_PyObject_Call2Args(__pyx_t_1, __pyx_t_6, __pyx_t_9) : __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_9);
+    __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    __pyx_v_true_sentence = __pyx_t_10;
-
-    /* "sentence.pyx":56
- *         label_idx = np.where(y_labels[i]==1)[0]
- *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab)
- *         pred_idx = np.where(preds[i] == 1)[0]             # <<<<<<<<<<<<<<
- *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab)
- * 
- */
-    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_where); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 56, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __pyx_t_1 = __Pyx_GetItemInt(((PyObject *)__pyx_v_preds), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 1, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_5 = __Pyx_PyInt_EqObjC(__pyx_t_1, __pyx_int_1, 1, 0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
+    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __pyx_t_1 = NULL;
-    if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_7))) {
-      __pyx_t_1 = PyMethod_GET_SELF(__pyx_t_7);
-      if (likely(__pyx_t_1)) {
-        PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_7);
-        __Pyx_INCREF(__pyx_t_1);
-        __Pyx_INCREF(function);
-        __Pyx_DECREF_SET(__pyx_t_7, function);
-      }
-    }
-    __pyx_t_9 = (__pyx_t_1) ? __Pyx_PyObject_Call2Args(__pyx_t_7, __pyx_t_1, __pyx_t_5) : __Pyx_PyObject_CallOneArg(__pyx_t_7, __pyx_t_5);
-    __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __pyx_t_1 = __Pyx_GetItemInt(__pyx_t_5, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 56, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_9);
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    __pyx_t_7 = __Pyx_GetItemInt(__pyx_t_9, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 56, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    if (!(likely(((__pyx_t_7) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_7, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 56, __pyx_L1_error)
-    __Pyx_XDECREF_SET(__pyx_v_pred_idx, ((PyArrayObject *)__pyx_t_7));
-    __pyx_t_7 = 0;
+    if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 56, __pyx_L1_error)
+    __Pyx_XDECREF_SET(__pyx_v_pred_idx, ((PyArrayObject *)__pyx_t_1));
+    __pyx_t_1 = 0;
 
     /* "sentence.pyx":57
- *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab)
+ *         true_sentence = sentence_from_indices(x_sources[i][label_idx], vocab, connect_enable=False)
  *         pred_idx = np.where(preds[i] == 1)[0]
- *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab)             # <<<<<<<<<<<<<<
+ *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab, connect_enable=False)             # <<<<<<<<<<<<<<
  * 
  *         m = dict()
  */
-    __Pyx_GetModuleGlobalName(__pyx_t_9, __pyx_n_s_sentence_from_indices); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 57, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_9);
+    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_sentence_from_indices); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 57, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
     __pyx_t_5 = __Pyx_GetItemInt(((PyObject *)__pyx_v_x_sources), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 1, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 57, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_1 = __Pyx_PyObject_GetItem(__pyx_t_5, ((PyObject *)__pyx_v_pred_idx)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 57, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_9 = __Pyx_PyObject_GetItem(__pyx_t_5, ((PyObject *)__pyx_v_pred_idx)); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 57, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_9);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    __pyx_t_5 = NULL;
-    __pyx_t_8 = 0;
-    if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_9))) {
-      __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_9);
-      if (likely(__pyx_t_5)) {
-        PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_9);
-        __Pyx_INCREF(__pyx_t_5);
-        __Pyx_INCREF(function);
-        __Pyx_DECREF_SET(__pyx_t_9, function);
-        __pyx_t_8 = 1;
-      }
-    }
-    #if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(__pyx_t_9)) {
-      PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_1, ((PyObject *)__pyx_v_vocab)};
-      __pyx_t_7 = __Pyx_PyFunction_FastCall(__pyx_t_9, __pyx_temp+1-__pyx_t_8, 2+__pyx_t_8); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 57, __pyx_L1_error)
-      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-      __Pyx_GOTREF(__pyx_t_7);
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    } else
-    #endif
-    #if CYTHON_FAST_PYCCALL
-    if (__Pyx_PyFastCFunction_Check(__pyx_t_9)) {
-      PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_1, ((PyObject *)__pyx_v_vocab)};
-      __pyx_t_7 = __Pyx_PyCFunction_FastCall(__pyx_t_9, __pyx_temp+1-__pyx_t_8, 2+__pyx_t_8); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 57, __pyx_L1_error)
-      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-      __Pyx_GOTREF(__pyx_t_7);
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    } else
-    #endif
-    {
-      __pyx_t_6 = PyTuple_New(2+__pyx_t_8); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 57, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_6);
-      if (__pyx_t_5) {
-        __Pyx_GIVEREF(__pyx_t_5); PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_5); __pyx_t_5 = NULL;
-      }
-      __Pyx_GIVEREF(__pyx_t_1);
-      PyTuple_SET_ITEM(__pyx_t_6, 0+__pyx_t_8, __pyx_t_1);
-      __Pyx_INCREF(((PyObject *)__pyx_v_vocab));
-      __Pyx_GIVEREF(((PyObject *)__pyx_v_vocab));
-      PyTuple_SET_ITEM(__pyx_t_6, 1+__pyx_t_8, ((PyObject *)__pyx_v_vocab));
-      __pyx_t_1 = 0;
-      __pyx_t_7 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_t_6, NULL); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 57, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_7);
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    }
+    __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 57, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_GIVEREF(__pyx_t_9);
+    PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_9);
+    __Pyx_INCREF(((PyObject *)__pyx_v_vocab));
+    __Pyx_GIVEREF(((PyObject *)__pyx_v_vocab));
+    PyTuple_SET_ITEM(__pyx_t_5, 1, ((PyObject *)__pyx_v_vocab));
+    __pyx_t_9 = 0;
+    __pyx_t_9 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 57, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_9);
+    if (PyDict_SetItem(__pyx_t_9, __pyx_n_s_connect_enable, Py_False) < 0) __PYX_ERR(0, 57, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_5, __pyx_t_9); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 57, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    __pyx_t_10 = __pyx_convert_string_from_py_std__in_string(__pyx_t_7); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 57, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __pyx_t_10 = __pyx_convert_string_from_py_std__in_string(__pyx_t_6); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 57, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __pyx_v_pred_sentence = __pyx_t_10;
 
     /* "sentence.pyx":59
- *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab)
+ *         pred_sentence = sentence_from_indices(x_sources[i][pred_idx], vocab, connect_enable=False)
  * 
  *         m = dict()             # <<<<<<<<<<<<<<
  *         m["input"] = source_sentence.decode("UTF-8")
  *         m["label"] = true_sentence.decode("UTF-8")
  */
-    __pyx_t_7 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 59, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __Pyx_DECREF_SET(__pyx_v_m, ((PyObject*)__pyx_t_7));
-    __pyx_t_7 = 0;
+    __pyx_t_6 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 59, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __Pyx_XDECREF_SET(__pyx_v_m, ((PyObject*)__pyx_t_6));
+    __pyx_t_6 = 0;
 
     /* "sentence.pyx":60
  * 
@@ -2809,10 +2738,10 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
  *         m["label"] = true_sentence.decode("UTF-8")
  *         m["pred"] = pred_sentence.decode("UTF-8")
  */
-    __pyx_t_7 = __Pyx_decode_cpp_string(__pyx_v_source_sentence, 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 60, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    if (unlikely(PyDict_SetItem(__pyx_v_m, __pyx_n_s_input, __pyx_t_7) < 0)) __PYX_ERR(0, 60, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __pyx_t_6 = __Pyx_decode_cpp_string(__pyx_v_source_sentence, 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    if (unlikely(PyDict_SetItem(__pyx_v_m, __pyx_n_s_input, __pyx_t_6) < 0)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
 
     /* "sentence.pyx":61
  *         m = dict()
@@ -2821,10 +2750,10 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
  *         m["pred"] = pred_sentence.decode("UTF-8")
  *         result_list.append(m)
  */
-    __pyx_t_7 = __Pyx_decode_cpp_string(__pyx_v_true_sentence, 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 61, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    if (unlikely(PyDict_SetItem(__pyx_v_m, __pyx_n_s_label, __pyx_t_7) < 0)) __PYX_ERR(0, 61, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __pyx_t_6 = __Pyx_decode_cpp_string(__pyx_v_true_sentence, 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 61, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    if (unlikely(PyDict_SetItem(__pyx_v_m, __pyx_n_s_label, __pyx_t_6) < 0)) __PYX_ERR(0, 61, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
 
     /* "sentence.pyx":62
  *         m["input"] = source_sentence.decode("UTF-8")
@@ -2833,10 +2762,10 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
  *         result_list.append(m)
  * 
  */
-    __pyx_t_7 = __Pyx_decode_cpp_string(__pyx_v_pred_sentence, 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 62, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    if (unlikely(PyDict_SetItem(__pyx_v_m, __pyx_n_s_pred, __pyx_t_7) < 0)) __PYX_ERR(0, 62, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __pyx_t_6 = __Pyx_decode_cpp_string(__pyx_v_pred_sentence, 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 62, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    if (unlikely(PyDict_SetItem(__pyx_v_m, __pyx_n_s_pred, __pyx_t_6) < 0)) __PYX_ERR(0, 62, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
 
     /* "sentence.pyx":63
  *         m["label"] = true_sentence.decode("UTF-8")
@@ -2853,7 +2782,7 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
  * 
  *     return result_list             # <<<<<<<<<<<<<<
  * 
- * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
+ * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):
  */
   __Pyx_XDECREF(__pyx_r);
   __Pyx_INCREF(__pyx_v_result_list);
@@ -2890,13 +2819,14 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_tl(struct __pyx_obj_11cvocab
 /* "sentence.pyx":67
  *     return result_list
  * 
- * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):             # <<<<<<<<<<<<<<
+ * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):             # <<<<<<<<<<<<<<
  *     cdef vector[string] out
- *     cdef string.iterator str_iter
+ *     cdef string out_sentence
  */
 
 static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  __pyx_v_indices, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab, struct __pyx_opt_args_8sentence_c_sentence_from_indices *__pyx_optional_args) {
   bool __pyx_v_strict = ((bool)1);
+  bool __pyx_v_connect_enable = ((bool)1);
   std::vector<std::string>  __pyx_v_out;
   std::string __pyx_v_out_sentence;
   int __pyx_v_index;
@@ -2918,10 +2848,13 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
   if (__pyx_optional_args) {
     if (__pyx_optional_args->__pyx_n > 0) {
       __pyx_v_strict = __pyx_optional_args->strict;
+      if (__pyx_optional_args->__pyx_n > 1) {
+        __pyx_v_connect_enable = __pyx_optional_args->connect_enable;
+      }
     }
   }
 
-  /* "sentence.pyx":73
+  /* "sentence.pyx":72
  *     cdef int index
  * 
  *     for index in indices:             # <<<<<<<<<<<<<<
@@ -2935,7 +2868,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
     ++__pyx_t_1;
     __pyx_v_index = __pyx_t_2;
 
-    /* "sentence.pyx":74
+    /* "sentence.pyx":73
  * 
  *     for index in indices:
  *         if index == vocab.begin_seq_index and strict:             # <<<<<<<<<<<<<<
@@ -2953,7 +2886,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
     __pyx_L6_bool_binop_done:;
     if (__pyx_t_3) {
 
-      /* "sentence.pyx":75
+      /* "sentence.pyx":74
  *     for index in indices:
  *         if index == vocab.begin_seq_index and strict:
  *             continue             # <<<<<<<<<<<<<<
@@ -2962,7 +2895,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  */
       goto __pyx_L3_continue;
 
-      /* "sentence.pyx":74
+      /* "sentence.pyx":73
  * 
  *     for index in indices:
  *         if index == vocab.begin_seq_index and strict:             # <<<<<<<<<<<<<<
@@ -2971,7 +2904,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  */
     }
 
-    /* "sentence.pyx":76
+    /* "sentence.pyx":75
  *         if index == vocab.begin_seq_index and strict:
  *             continue
  *         elif index == vocab.end_seq_index and strict:             # <<<<<<<<<<<<<<
@@ -2989,7 +2922,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
     __pyx_L8_bool_binop_done:;
     if (__pyx_t_3) {
 
-      /* "sentence.pyx":77
+      /* "sentence.pyx":76
  *             continue
  *         elif index == vocab.end_seq_index and strict:
  *             break             # <<<<<<<<<<<<<<
@@ -2998,7 +2931,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  */
       goto __pyx_L4_break;
 
-      /* "sentence.pyx":76
+      /* "sentence.pyx":75
  *         if index == vocab.begin_seq_index and strict:
  *             continue
  *         elif index == vocab.end_seq_index and strict:             # <<<<<<<<<<<<<<
@@ -3007,7 +2940,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  */
     }
 
-    /* "sentence.pyx":78
+    /* "sentence.pyx":77
  *         elif index == vocab.end_seq_index and strict:
  *             break
  *         elif index == vocab.mask_index and strict:             # <<<<<<<<<<<<<<
@@ -3025,7 +2958,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
     __pyx_L10_bool_binop_done:;
     if (__pyx_t_3) {
 
-      /* "sentence.pyx":79
+      /* "sentence.pyx":78
  *             break
  *         elif index == vocab.mask_index and strict:
  *             break             # <<<<<<<<<<<<<<
@@ -3034,7 +2967,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  */
       goto __pyx_L4_break;
 
-      /* "sentence.pyx":78
+      /* "sentence.pyx":77
  *         elif index == vocab.end_seq_index and strict:
  *             break
  *         elif index == vocab.mask_index and strict:             # <<<<<<<<<<<<<<
@@ -3043,7 +2976,7 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  */
     }
 
-    /* "sentence.pyx":81
+    /* "sentence.pyx":80
  *             break
  *         else:
  *             out.push_back(vocab.lookup_index(index).encode("UTF-8"))             # <<<<<<<<<<<<<<
@@ -3051,9 +2984,9 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
  *     out_sentence = join(out, " ")
  */
     /*else*/ {
-      __pyx_t_6 = ((struct __pyx_vtabstruct_11cvocabulary_SequenceVocabulary *)__pyx_v_vocab->__pyx_base.__pyx_vtab)->__pyx_base.lookup_index(((struct __pyx_obj_11cvocabulary_Vocabulary *)__pyx_v_vocab), __pyx_v_index, 0); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 81, __pyx_L1_error)
+      __pyx_t_6 = ((struct __pyx_vtabstruct_11cvocabulary_SequenceVocabulary *)__pyx_v_vocab->__pyx_base.__pyx_vtab)->__pyx_base.lookup_index(((struct __pyx_obj_11cvocabulary_Vocabulary *)__pyx_v_vocab), __pyx_v_index, 0); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 80, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_6);
-      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_encode); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 81, __pyx_L1_error)
+      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_encode); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 80, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_7);
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
       __pyx_t_6 = NULL;
@@ -3068,20 +3001,20 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
       }
       __pyx_t_5 = (__pyx_t_6) ? __Pyx_PyObject_Call2Args(__pyx_t_7, __pyx_t_6, __pyx_kp_s_UTF_8) : __Pyx_PyObject_CallOneArg(__pyx_t_7, __pyx_kp_s_UTF_8);
       __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 81, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 80, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-      __pyx_t_8 = __pyx_convert_string_from_py_std__in_string(__pyx_t_5); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 81, __pyx_L1_error)
+      __pyx_t_8 = __pyx_convert_string_from_py_std__in_string(__pyx_t_5); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
       try {
         __pyx_v_out.push_back(__pyx_t_8);
       } catch(...) {
         __Pyx_CppExn2PyErr();
-        __PYX_ERR(0, 81, __pyx_L1_error)
+        __PYX_ERR(0, 80, __pyx_L1_error)
       }
     }
 
-    /* "sentence.pyx":73
+    /* "sentence.pyx":72
  *     cdef int index
  * 
  *     for index in indices:             # <<<<<<<<<<<<<<
@@ -3092,29 +3025,48 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
   }
   __pyx_L4_break:;
 
-  /* "sentence.pyx":83
+  /* "sentence.pyx":82
  *             out.push_back(vocab.lookup_index(index).encode("UTF-8"))
  * 
  *     out_sentence = join(out, " ")             # <<<<<<<<<<<<<<
  * 
- *     out_sentence = replace_all(out_sentence, " ##", "")
+ *     if connect_enable :
  */
-  __pyx_t_8 = __pyx_convert_string_from_py_std__in_string(__pyx_kp_b_); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 83, __pyx_L1_error)
+  __pyx_t_8 = __pyx_convert_string_from_py_std__in_string(__pyx_kp_b_); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 82, __pyx_L1_error)
   __pyx_v_out_sentence = join(__pyx_v_out, __pyx_t_8);
 
-  /* "sentence.pyx":85
+  /* "sentence.pyx":84
  *     out_sentence = join(out, " ")
  * 
- *     out_sentence = replace_all(out_sentence, " ##", "")             # <<<<<<<<<<<<<<
+ *     if connect_enable :             # <<<<<<<<<<<<<<
+ *         out_sentence = replace_all(out_sentence, " ##", "")
+ * 
+ */
+  __pyx_t_3 = (__pyx_v_connect_enable != 0);
+  if (__pyx_t_3) {
+
+    /* "sentence.pyx":85
+ * 
+ *     if connect_enable :
+ *         out_sentence = replace_all(out_sentence, " ##", "")             # <<<<<<<<<<<<<<
  * 
  *     return out_sentence
  */
-  __pyx_t_8 = __pyx_convert_string_from_py_std__in_string(__pyx_kp_b__2); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 85, __pyx_L1_error)
-  __pyx_t_9 = __pyx_convert_string_from_py_std__in_string(__pyx_kp_b__3); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 85, __pyx_L1_error)
-  __pyx_v_out_sentence = replace_all(__pyx_v_out_sentence, __pyx_t_8, __pyx_t_9);
+    __pyx_t_8 = __pyx_convert_string_from_py_std__in_string(__pyx_kp_b__2); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 85, __pyx_L1_error)
+    __pyx_t_9 = __pyx_convert_string_from_py_std__in_string(__pyx_kp_b__3); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 85, __pyx_L1_error)
+    __pyx_v_out_sentence = replace_all(__pyx_v_out_sentence, __pyx_t_8, __pyx_t_9);
+
+    /* "sentence.pyx":84
+ *     out_sentence = join(out, " ")
+ * 
+ *     if connect_enable :             # <<<<<<<<<<<<<<
+ *         out_sentence = replace_all(out_sentence, " ##", "")
+ * 
+ */
+  }
 
   /* "sentence.pyx":87
- *     out_sentence = replace_all(out_sentence, " ##", "")
+ *         out_sentence = replace_all(out_sentence, " ##", "")
  * 
  *     return out_sentence             # <<<<<<<<<<<<<<
  * 
@@ -3126,9 +3078,9 @@ static std::string __pyx_f_8sentence_c_sentence_from_indices(std::vector<int>  _
   /* "sentence.pyx":67
  *     return result_list
  * 
- * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):             # <<<<<<<<<<<<<<
+ * cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):             # <<<<<<<<<<<<<<
  *     cdef vector[string] out
- *     cdef string.iterator str_iter
+ *     cdef string out_sentence
  */
 
   /* function exit code */
@@ -3439,7 +3391,7 @@ static PyObject *__pyx_pf_8sentence_2batch_sentence_tl(CYTHON_UNUSED PyObject *_
  * def batch_sentence_tl(SequenceVocabulary vocab, np.ndarray x_sources, np.ndarray y_labels, np.ndarray preds, int batch_size):
  *     return c_batch_sentence_tl(vocab, x_sources, y_labels, preds, batch_size)             # <<<<<<<<<<<<<<
  * 
- * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
+ * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_1 = __pyx_f_8sentence_c_batch_sentence_tl(__pyx_v_vocab, __pyx_v_x_sources, __pyx_v_y_labels, __pyx_v_preds, __pyx_v_batch_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 94, __pyx_L1_error)
@@ -3470,8 +3422,8 @@ static PyObject *__pyx_pf_8sentence_2batch_sentence_tl(CYTHON_UNUSED PyObject *_
 /* "sentence.pyx":96
  *     return c_batch_sentence_tl(vocab, x_sources, y_labels, preds, batch_size)
  * 
- * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):             # <<<<<<<<<<<<<<
- *     return c_sentence_from_indices(indices, vocab, strict)
+ * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):             # <<<<<<<<<<<<<<
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  */
 
@@ -3482,6 +3434,7 @@ static PyObject *__pyx_pw_8sentence_5sentence_from_indices(PyObject *__pyx_self,
   std::vector<int>  __pyx_v_indices;
   struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab = 0;
   bool __pyx_v_strict;
+  bool __pyx_v_connect_enable;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3489,12 +3442,14 @@ static PyObject *__pyx_pw_8sentence_5sentence_from_indices(PyObject *__pyx_self,
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("sentence_from_indices (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_indices,&__pyx_n_s_vocab,&__pyx_n_s_strict,0};
-    PyObject* values[3] = {0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_indices,&__pyx_n_s_vocab,&__pyx_n_s_strict,&__pyx_n_s_connect_enable,0};
+    PyObject* values[4] = {0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
         CYTHON_FALLTHROUGH;
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
@@ -3513,7 +3468,7 @@ static PyObject *__pyx_pw_8sentence_5sentence_from_indices(PyObject *__pyx_self,
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_vocab)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("sentence_from_indices", 0, 2, 3, 1); __PYX_ERR(0, 96, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("sentence_from_indices", 0, 2, 4, 1); __PYX_ERR(0, 96, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
@@ -3521,12 +3476,20 @@ static PyObject *__pyx_pw_8sentence_5sentence_from_indices(PyObject *__pyx_self,
           PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_strict);
           if (value) { values[2] = value; kw_args--; }
         }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_connect_enable);
+          if (value) { values[3] = value; kw_args--; }
+        }
       }
       if (unlikely(kw_args > 0)) {
         if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "sentence_from_indices") < 0)) __PYX_ERR(0, 96, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
         CYTHON_FALLTHROUGH;
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
@@ -3542,17 +3505,22 @@ static PyObject *__pyx_pw_8sentence_5sentence_from_indices(PyObject *__pyx_self,
     } else {
       __pyx_v_strict = ((bool)1);
     }
+    if (values[3]) {
+      __pyx_v_connect_enable = __Pyx_PyObject_IsTrue(values[3]); if (unlikely((__pyx_v_connect_enable == ((bool)-1)) && PyErr_Occurred())) __PYX_ERR(0, 96, __pyx_L3_error)
+    } else {
+      __pyx_v_connect_enable = ((bool)1);
+    }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("sentence_from_indices", 0, 2, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 96, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("sentence_from_indices", 0, 2, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 96, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("sentence.sentence_from_indices", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_vocab), __pyx_ptype_11cvocabulary_SequenceVocabulary, 1, "vocab", 0))) __PYX_ERR(0, 96, __pyx_L1_error)
-  __pyx_r = __pyx_pf_8sentence_4sentence_from_indices(__pyx_self, __pyx_v_indices, __pyx_v_vocab, __pyx_v_strict);
+  __pyx_r = __pyx_pf_8sentence_4sentence_from_indices(__pyx_self, __pyx_v_indices, __pyx_v_vocab, __pyx_v_strict, __pyx_v_connect_enable);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3563,7 +3531,7 @@ static PyObject *__pyx_pw_8sentence_5sentence_from_indices(PyObject *__pyx_self,
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObject *__pyx_self, std::vector<int>  __pyx_v_indices, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab, bool __pyx_v_strict) {
+static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObject *__pyx_self, std::vector<int>  __pyx_v_indices, struct __pyx_obj_11cvocabulary_SequenceVocabulary *__pyx_v_vocab, bool __pyx_v_strict, bool __pyx_v_connect_enable) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   std::string __pyx_t_1;
@@ -3576,14 +3544,15 @@ static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObjec
 
   /* "sentence.pyx":97
  * 
- * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
- *     return c_sentence_from_indices(indices, vocab, strict)             # <<<<<<<<<<<<<<
+ * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)             # <<<<<<<<<<<<<<
  * 
  * def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_2.__pyx_n = 1;
+  __pyx_t_2.__pyx_n = 2;
   __pyx_t_2.strict = __pyx_v_strict;
+  __pyx_t_2.connect_enable = __pyx_v_connect_enable;
   __pyx_t_1 = __pyx_f_8sentence_c_sentence_from_indices(__pyx_v_indices, __pyx_v_vocab, &__pyx_t_2); 
   __pyx_t_3 = __pyx_convert_PyBytes_string_to_py_std__in_string(__pyx_t_1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 97, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
@@ -3594,8 +3563,8 @@ static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObjec
   /* "sentence.pyx":96
  *     return c_batch_sentence_tl(vocab, x_sources, y_labels, preds, batch_size)
  * 
- * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):             # <<<<<<<<<<<<<<
- *     return c_sentence_from_indices(indices, vocab, strict)
+ * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):             # <<<<<<<<<<<<<<
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  */
 
@@ -3611,7 +3580,7 @@ static PyObject *__pyx_pf_8sentence_4sentence_from_indices(CYTHON_UNUSED PyObjec
 }
 
 /* "sentence.pyx":99
- *     return c_sentence_from_indices(indices, vocab, strict)
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  * def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):             # <<<<<<<<<<<<<<
  *     return sentence_from_indices(indices, source_vocab)
@@ -3762,7 +3731,7 @@ static PyObject *__pyx_pf_8sentence_6get_source_sentence(CYTHON_UNUSED PyObject 
   goto __pyx_L0;
 
   /* "sentence.pyx":99
- *     return c_sentence_from_indices(indices, vocab, strict)
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  * def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):             # <<<<<<<<<<<<<<
  *     return sentence_from_indices(indices, source_vocab)
@@ -5462,6 +5431,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_batch_sentence_tl, __pyx_k_batch_sentence_tl, sizeof(__pyx_k_batch_sentence_tl), 0, 0, 1, 1},
   {&__pyx_n_s_batch_size, __pyx_k_batch_size, sizeof(__pyx_k_batch_size), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
+  {&__pyx_n_s_connect_enable, __pyx_k_connect_enable, sizeof(__pyx_k_connect_enable), 0, 0, 1, 1},
   {&__pyx_n_s_encode, __pyx_k_encode, sizeof(__pyx_k_encode), 0, 0, 1, 1},
   {&__pyx_n_s_get_source_sentence, __pyx_k_get_source_sentence, sizeof(__pyx_k_get_source_sentence), 0, 0, 1, 1},
   {&__pyx_n_s_get_true_sentence, __pyx_k_get_true_sentence, sizeof(__pyx_k_get_true_sentence), 0, 0, 1, 1},
@@ -5556,17 +5526,17 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   /* "sentence.pyx":96
  *     return c_batch_sentence_tl(vocab, x_sources, y_labels, preds, batch_size)
  * 
- * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):             # <<<<<<<<<<<<<<
- *     return c_sentence_from_indices(indices, vocab, strict)
+ * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):             # <<<<<<<<<<<<<<
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  */
-  __pyx_tuple__10 = PyTuple_Pack(3, __pyx_n_s_indices, __pyx_n_s_vocab, __pyx_n_s_strict); if (unlikely(!__pyx_tuple__10)) __PYX_ERR(0, 96, __pyx_L1_error)
+  __pyx_tuple__10 = PyTuple_Pack(4, __pyx_n_s_indices, __pyx_n_s_vocab, __pyx_n_s_strict, __pyx_n_s_connect_enable); if (unlikely(!__pyx_tuple__10)) __PYX_ERR(0, 96, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__10);
   __Pyx_GIVEREF(__pyx_tuple__10);
-  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(3, 0, 3, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_sentence_pyx, __pyx_n_s_sentence_from_indices, 96, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(0, 96, __pyx_L1_error)
+  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(4, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_sentence_pyx, __pyx_n_s_sentence_from_indices, 96, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(0, 96, __pyx_L1_error)
 
   /* "sentence.pyx":99
- *     return c_sentence_from_indices(indices, vocab, strict)
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  * def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):             # <<<<<<<<<<<<<<
  *     return sentence_from_indices(indices, source_vocab)
@@ -5985,8 +5955,8 @@ if (!__Pyx_RefNanny) {
   /* "sentence.pyx":96
  *     return c_batch_sentence_tl(vocab, x_sources, y_labels, preds, batch_size)
  * 
- * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):             # <<<<<<<<<<<<<<
- *     return c_sentence_from_indices(indices, vocab, strict)
+ * def sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True, bool connect_enable=True):             # <<<<<<<<<<<<<<
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  */
   __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8sentence_5sentence_from_indices, NULL, __pyx_n_s_sentence); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 96, __pyx_L1_error)
@@ -5995,7 +5965,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "sentence.pyx":99
- *     return c_sentence_from_indices(indices, vocab, strict)
+ *     return c_sentence_from_indices(indices, vocab, strict, connect_enable)
  * 
  * def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):             # <<<<<<<<<<<<<<
  *     return sentence_from_indices(indices, source_vocab)

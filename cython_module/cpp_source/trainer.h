@@ -67,6 +67,7 @@ Trainer<T>::Trainer(PyObject* args, PyObject* py_train_state)
 
     if (torch::cuda::is_available())
         cur_device = torch::Device(torch::kCUDA);
+    
 }
 
 template <typename T>

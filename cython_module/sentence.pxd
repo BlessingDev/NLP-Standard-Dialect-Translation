@@ -16,4 +16,4 @@ cdef list c_batch_sentence_mt(SequenceVocabulary source_vocab, SequenceVocabular
 
 cdef list c_batch_sentence_tl(SequenceVocabulary vocab, np.ndarray x_sources, np.ndarray y_labels, np.ndarray preds, int batch_size)
 
-cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=*)
+cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=*, bool connect_enable=*)

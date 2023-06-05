@@ -1,5 +1,7 @@
 #include "labeling_trainer.h"
 #include <tuple>
+#include <cstring>
+#include <atlstr.h>
 #include "metric.h"
 #include "tqdm/tqdm.h"
 
@@ -41,6 +43,21 @@ void LabelingTrainer::InitModel()
         class_num);
 
     model->to(cur_device);
+
+    int64_t p_num = 0;
+    for(auto p : model->parameters())
+    {
+        p_num += p.numel();
+    }
+
+    /*
+    std::wstring uni(L"모델 파라미터 수: ");
+    char str_utf8[256] = {0, };
+    int nLen = WideCharToMultiByte(CP_UTF8, 0, uni.c_str(), lstrlenW(uni.c_str()), NULL, 0, NULL, NULL);
+    WideCharToMultiByte(CP_UTF8, 0, uni.c_str(), lstrlenW(uni.c_str()), str_utf8, nLen, NULL, NULL);
+    */
+
+    std::cout << "num of parameters: " << p_num << std::endl;
 }
 
 void LabelingTrainer::InitTrain()

@@ -67,9 +67,9 @@ def main():
         default=32
     )
 
-    #args = parser.parse_args()
-    args = parser.parse_args(["--train_result_path", "model_storage/labeling_model_4/logs/train_at_2023-05-19_16_30.json",
-                              "--batch_size", "96"])
+    args = parser.parse_args()
+    '''args = parser.parse_args(["--train_result_path", "model_storage/labeling_model_4/logs/train_at_2023-05-19_16_30.json",
+                              "--batch_size", "96"])'''
 
     # console argument 구성 및 받아오기
 
@@ -109,6 +109,8 @@ def main():
 
     eval_dict = {
         "acc.": 0,
+        "precision": 0,
+        "recall": 0,
         "f1_score": 0,
     }
     result_sentence = []
@@ -124,11 +126,15 @@ def main():
             x_source = batch_dict["x"].cpu().data.numpy()
             y_pred_idx = y_pred_idx.cpu().data.numpy()
             y_true = y_true.cpu().data.numpy()
-            f1_t = cmetric.batch_f1(y_pred_idx, y_true) * 100
+            metric_dict = cmetric.batch_f1(y_pred_idx, y_true)
+            f1_t = metric_dict["f1"] * 100
+            pre_t = metric_dict["precision"] * 100
+            rec_t = metric_dict["recall"] * 100
             eval_dict["f1_score"] += (f1_t - eval_dict["f1_score"]) / (batch_index + 1)
+            eval_dict["precision"] += (pre_t - eval_dict["precision"]) / (batch_index + 1)
+            eval_dict["recall"] += (rec_t - eval_dict["recall"]) / (batch_index + 1)
 
-            y_pred = y_pred.cpu().data.numpy()
-            batch_sentence_result = sentence.batch_sentence_tl(cvocab, x_source, y_true, y_pred, args.batch_size)
+            batch_sentence_result = sentence.batch_sentence_tl(cvocab, x_source, y_true, y_pred_idx, args.batch_size)
             result_sentence.extend(batch_sentence_result)
 
             test_bar.set_postfix(f1=eval_dict["f1_score"])

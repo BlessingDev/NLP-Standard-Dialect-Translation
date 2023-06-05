@@ -110,8 +110,8 @@ def main():
                 batch_size=192,
                 num_epochs=100,
                 early_stopping_criteria=5,
-                embedding_size=64,
-                rnn_hidden_size=100,
+                embedding_size=100,
+                rnn_hidden_size=150,
                 class_num=2)
     
     # console argument 구성 및 받아오기

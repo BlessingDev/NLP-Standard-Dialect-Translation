@@ -11,6 +11,7 @@ import os
 import json
 import datetime
 import gc
+import time
 import tqdm.cli as tqdm
 
 def set_seed_everywhere(seed, cuda):
@@ -172,7 +173,8 @@ def train_mt_model(args, data_set, vectorizer, model):
 
     try:
         for epoch_index in range(args.num_epochs):
-
+            
+            start_time = time.time()
             # 훈련 세트에 대한 순회
 
             # 훈련 세트와 배치 제너레이터 준비, 손실과 정확도를 0으로 설정
@@ -255,6 +257,10 @@ def train_mt_model(args, data_set, vectorizer, model):
 
             train_state = update_train_state(args=args, model=model, 
                                             train_state=train_state)
+            
+            end_time = time.time()
+
+            #print(f"epoch 실행 시간: {end_time - start_time}")
 
             scheduler.step(train_state['val_loss'][-1])
 
@@ -275,6 +281,9 @@ def train_mt_model(args, data_set, vectorizer, model):
     return train_state
 
 def train_tl_model(args, data_set, vectorizer, model):
+    p_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"모델 파라미터 수: {p_num}")
+
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                             mode='min', factor=0.5,
@@ -298,11 +307,14 @@ def train_tl_model(args, data_set, vectorizer, model):
     
     train_state = make_train_state(args)
     device = torch.device("cuda" if args.cuda else "cpu")
+    class_weight = torch.FloatTensor([0.001, 0.999])
+    class_weight = class_weight.to(device)
 
     try:
         for epoch_index in range(args.num_epochs):
 
             # 훈련 세트에 대한 순회
+            start_time = time.time()
 
             # 훈련 세트와 배치 제너레이터 준비, 손실과 정확도를 0으로 설정
             data_set.set_split('train')
@@ -327,7 +339,7 @@ def train_tl_model(args, data_set, vectorizer, model):
                 y_true = y_true.to(torch.long)
 
                 # 단계 3. 손실을 계산합니다
-                loss = F.cross_entropy(y_pred, y_true)
+                loss = F.cross_entropy(y_pred, y_true, weight=class_weight)
 
                 # 단계 4. 손실을 사용해 그레이디언트를 계산합니다
                 loss.backward()
@@ -389,6 +401,10 @@ def train_tl_model(args, data_set, vectorizer, model):
 
             train_state = update_train_state(args=args, model=model, 
                                             train_state=train_state)
+            
+            end_time = time.time()
+
+            print(f"epoch 실행 시간: {end_time - start_time}")
 
             scheduler.step(train_state['val_loss'][-1])
 
@@ -397,8 +413,8 @@ def train_tl_model(args, data_set, vectorizer, model):
                 
             train_bar.n = 0
             val_bar.n = 0
-            epoch_bar.set_postfix(best_val=train_state['early_stopping_best_val'] )
-            epoch_bar.update()
+            #epoch_bar.set_postfix(best_val=train_state['early_stopping_best_val'] )
+            #epoch_bar.update()
             train_state['epoch_index'] += 1
             
     except KeyboardInterrupt:
@@ -435,7 +451,7 @@ def tl_args():
                 vectorizer_file="vectorizer.json",
                 model_state_file="model.pth",
                 log_json_file="logs/train_at_{time}.json",
-                save_dir="model_storage/labeling_model_4",
+                save_dir="model_storage/labeling_model_5",
                 expand_filepaths_to_save_dir=True,
                 reload_from_files=False,
                 make_npy_file=False,
@@ -443,9 +459,9 @@ def tl_args():
                 learning_rate=5e-4,
                 batch_size=192,
                 num_epochs=100,
-                early_stopping_criteria=3,
-                embedding_size=64,
-                rnn_hidden_size=100)
+                early_stopping_criteria=5,
+                embedding_size=100,
+                rnn_hidden_size=150)
 
 def main():
     args = tl_args()
@@ -486,7 +502,7 @@ def main():
     data_set, vectorizer, model = init_model_and_dataset_tl(args)
 
     #model_trace = torch.jit.load("model_storage\\labeling_model_3\\model_2023-05-19_15_58.pth", map_location=torch.device("cpu"))
-    model.load_state_dict(torch.load("model_storage\\labeling_model_4\\model_2023-05-19_16_30.pth"))
+    #model.load_state_dict(torch.load("model_storage\\labeling_model_4\\model_2023-05-19_16_30.pth"))
 
     #del model_trace
     #gc.collect()
