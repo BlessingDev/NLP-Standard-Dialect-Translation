@@ -31,7 +31,7 @@ cdef list c_batch_sentence_mt(SequenceVocabulary source_vocab, SequenceVocabular
         pred_idx = np.argmax(preds[i], axis=1)
         pred_sentence = sentence_from_indices(pred_idx, target_vocab)
 
-        m.clear()
+        m = dict()
         m["source"] = source_sentence.decode("UTF-8")
         m["truth"] = true_sentence.decode("UTF-8")
         m["pred"] = pred_sentence.decode("UTF-8")

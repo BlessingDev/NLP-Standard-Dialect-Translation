@@ -79,7 +79,7 @@ def terse_attention(encoder_state_vectors, query_vector):
 
 
 class NMTDecoder(nn.Module):
-    def __init__(self, num_embeddings, embedding_size, rnn_hidden_size, bos_index):
+    def __init__(self, num_embeddings, embedding_size, rnn_hidden_size, bos_index, eos_index, max_seq_length):
         """
         매개변수:
             num_embeddings (int): 임베딩 개수는 타깃 어휘 사전에 있는 고유한 단어의 개수이다
@@ -97,6 +97,8 @@ class NMTDecoder(nn.Module):
         self.hidden_map = nn.Linear(rnn_hidden_size, rnn_hidden_size)
         self.classifier = nn.Linear(rnn_hidden_size * 2, num_embeddings)
         self.bos_index = bos_index
+        self.eos_index = eos_index
+        self.max_seq_length = max_seq_length
     
     def _init_indices(self, batch_size):
         """ BEGIN-OF-SEQUENCE 인덱스 벡터를 반환합니다 """
@@ -169,12 +171,67 @@ class NMTDecoder(nn.Module):
         
         return output_vectors
     
-    
+    def inference(self, encoder_state, initial_hidden_state):
+
+        # 주어진 인코더의 은닉 상태를 초기 은닉 상태로 사용합니다
+        h_t = self.hidden_map(initial_hidden_state)
+
+        batch_size = encoder_state.size(0)
+        # 문맥 벡터를 0으로 초기화합니다
+        context_vectors = self._init_context_vectors(batch_size)
+        # 첫 단어 y_t를 BOS로 초기화합니다
+        y_t_index = self._init_indices(batch_size)
+        
+        h_t = h_t.to(encoder_state.device)
+        y_t_index = y_t_index.to(encoder_state.device)
+        context_vectors = context_vectors.to(encoder_state.device)
+
+        output_vectors = []
+        self._cached_p_attn = []
+        self._cached_ht = []
+        self._cached_decoder_state = encoder_state.cpu().detach().numpy()
+        
+        idx = 0
+        generation_finished = False
+        while idx < self.max_seq_length and not generation_finished:
+            if len(output_vectors) > 0:
+                y_t_index = output_vectors[-1].max(dim=1).indices
+            
+            # 단계 1: 단어를 임베딩하고 이전 문맥과 연결합니다
+            y_input_vector = self.target_embedding(y_t_index)
+            rnn_input = torch.cat([y_input_vector, context_vectors], dim=1)
+            
+            # 단계 2: GRU를 적용하고 새로운 은닉 벡터를 얻습니다
+            h_t = self.gru_cell(rnn_input, h_t)
+            self._cached_ht.append(h_t.cpu().detach().numpy())
+            
+            # 단계 3: 현재 은닉 상태를 사용해 인코더의 상태를 주목합니다
+            context_vectors, p_attn, _ = verbose_attention(encoder_state_vectors=encoder_state, 
+                                                           query_vector=h_t)
+            
+            # 부가 작업: 시각화를 위해 어텐션 확률을 저장합니다
+            self._cached_p_attn.append(p_attn.cpu().detach().numpy())
+            
+            # 단게 4: 현재 은닉 상태와 문맥 벡터를 사용해 다음 단어를 예측합니다
+            prediction_vector = torch.cat((context_vectors, h_t), dim=1)
+            score_for_y_t_index = self.classifier(F.dropout(prediction_vector, 0.3))
+            
+            # 부가 작업: 예측 성능 점수를 기록합니다
+            output_vectors.append(score_for_y_t_index)
+
+            idx += 1
+            
+        output_vectors = torch.stack(output_vectors).permute(1, 0, 2)
+        
+        return output_vectors
+
+
 class NMTModel(nn.Module):
     """ 신경망 기계 번역 모델 """
     def __init__(self, source_vocab_size, source_embedding_size, 
                  target_vocab_size, target_embedding_size, encoding_size, 
-                 target_bos_index):
+                 target_bos_index, target_eos_index, 
+                 max_gen_length=256):
         """
         매개변수:
             source_vocab_size (int): 소스 언어에 있는 고유한 단어 개수
@@ -192,9 +249,11 @@ class NMTModel(nn.Module):
         self.decoder = NMTDecoder(num_embeddings=target_vocab_size, 
                                   embedding_size=target_embedding_size, 
                                   rnn_hidden_size=decoding_size,
-                                  bos_index=target_bos_index)
+                                  bos_index=target_bos_index,
+                                  eos_index=target_eos_index,
+                                  max_seq_length=max_gen_length)
     
-    def forward(self, x_source, x_source_lengths, target_sequence):
+    def forward(self, x_source, x_source_lengths, target_sequence=None):
         """ 모델의 정방향 계산
         
         매개변수:
@@ -206,7 +265,11 @@ class NMTModel(nn.Module):
             decoded_states (torch.Tensor): 각 출력 타임 스텝의 예측 벡터
         """
         encoder_state, final_hidden_states = self.encoder(x_source, x_source_lengths)
-        decoded_states = self.decoder(encoder_state=encoder_state, 
-                                      initial_hidden_state=final_hidden_states, 
-                                      target_sequence=target_sequence)
+        if target_sequence:
+            decoded_states = self.decoder(encoder_state=encoder_state, 
+                                        initial_hidden_state=final_hidden_states, 
+                                        target_sequence=target_sequence)
+        else:
+            decoded_states = self.decoder.inference(encoder_state=encoder_state, 
+                                        initial_hidden_state=final_hidden_states)
         return decoded_states

@@ -63,7 +63,20 @@ class NMTVectorizer(object):
         x_indices = [self.target_vocab.begin_seq_index] + indices
         y_indices = indices + [self.target_vocab.end_seq_index]
         return x_indices, y_indices
+    
+    def vectorize(self, source_text, use_dataset_max_lengths=True):
+        source_vector_length = -1
+        if use_dataset_max_lengths:
+            source_vector_length = self.max_source_length + 2
+
+        source_indices = self._get_source_indices(source_text)
+        source_vector = self._vectorize(source_indices, 
+                                        vector_length=source_vector_length, 
+                                        mask_index=self.source_vocab.mask_index)
         
+        return source_vector
+        
+
     def vectorize(self, source_text, target_text, use_dataset_max_lengths=True):
         """ 벡터화된 소스 텍스트와 타깃 텍스트를 반환합니다
         

@@ -84,7 +84,9 @@ def main():
                  target_vocab_size=len(vectorizer.target_vocab),
                  target_embedding_size=default_args.target_embedding_size, 
                  encoding_size=default_args.encoding_size,
-                 target_bos_index=vectorizer.target_vocab.begin_seq_index)
+                 target_bos_index=vectorizer.target_vocab.begin_seq_index,
+                 target_eos_index=vectorizer.target_vocab.end_seq_index,
+                 max_gen_length=vectorizer.max_target_length + 1)
     model.load_state_dict(torch.load(args.model_state_file))
 
     model = model.to(args.device)
@@ -104,8 +106,7 @@ def main():
     try:
         for batch_index, batch_dict in enumerate(batch_generator):
             y_pred = model(batch_dict['x_source'], 
-                            batch_dict['x_source_length'], 
-                            batch_dict['x_target'])
+                            batch_dict['x_source_length'])
 
             acc_t = compute_accuracy_mt(y_pred, batch_dict['y_target'], mask_index)
             running_acc += (acc_t - running_acc) / (batch_index + 1)

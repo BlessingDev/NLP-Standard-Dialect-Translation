@@ -1507,9 +1507,6 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_Call(PyObject *func, PyObject *arg
 /* ExtTypeTest.proto */
 static CYTHON_INLINE int __Pyx_TypeTest(PyObject *obj, PyTypeObject *type);
 
-/* py_dict_clear.proto */
-#define __Pyx_PyDict_Clear(d) (PyDict_Clear(d), 0)
-
 /* IncludeCppStringH.proto */
 #include <string>
 
@@ -2304,7 +2301,7 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_mt(struct __pyx_obj_11cvocab
  *         pred_idx = np.argmax(preds[i], axis=1)
  *         pred_sentence = sentence_from_indices(pred_idx, target_vocab)             # <<<<<<<<<<<<<<
  * 
- *         m.clear()
+ *         m = dict()
  */
     __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_sentence_from_indices); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
@@ -2360,15 +2357,18 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_mt(struct __pyx_obj_11cvocab
     /* "sentence.pyx":34
  *         pred_sentence = sentence_from_indices(pred_idx, target_vocab)
  * 
- *         m.clear()             # <<<<<<<<<<<<<<
+ *         m = dict()             # <<<<<<<<<<<<<<
  *         m["source"] = source_sentence.decode("UTF-8")
  *         m["truth"] = true_sentence.decode("UTF-8")
  */
-    __pyx_t_11 = __Pyx_PyDict_Clear(__pyx_v_m); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 34, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 34, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_9);
+    __Pyx_DECREF_SET(__pyx_v_m, ((PyObject*)__pyx_t_9));
+    __pyx_t_9 = 0;
 
     /* "sentence.pyx":35
  * 
- *         m.clear()
+ *         m = dict()
  *         m["source"] = source_sentence.decode("UTF-8")             # <<<<<<<<<<<<<<
  *         m["truth"] = true_sentence.decode("UTF-8")
  *         m["pred"] = pred_sentence.decode("UTF-8")
@@ -2379,7 +2379,7 @@ static PyObject *__pyx_f_8sentence_c_batch_sentence_mt(struct __pyx_obj_11cvocab
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
 
     /* "sentence.pyx":36
- *         m.clear()
+ *         m = dict()
  *         m["source"] = source_sentence.decode("UTF-8")
  *         m["truth"] = true_sentence.decode("UTF-8")             # <<<<<<<<<<<<<<
  *         m["pred"] = pred_sentence.decode("UTF-8")
