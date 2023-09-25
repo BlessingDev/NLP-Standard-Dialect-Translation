@@ -6,6 +6,9 @@ from libcpp.map cimport map
 from libcpp cimport bool
 
 from cvocabulary cimport SequenceVocabulary
+from cjamo import jamo_to_hangeul
+
+import re
 
 import numpy as np
 cimport numpy as np
@@ -101,3 +104,71 @@ def get_source_sentence(SequenceVocabulary source_vocab, np.ndarray indices):
 
 def get_true_sentence(SequenceVocabulary target_vocab, np.ndarray indices):
     return sentence_from_indices(indices, target_vocab)
+
+def sentence_from_jamo_indices(vector[int] indices, SequenceVocabulary vocab, bool strict=True):
+    cdef list jamo_list = []
+    cdef list out = []
+    cdef str cur_c
+    cdef int jamo_len
+    cdef str hangeul_pattern = "[ㄱ-ㅎ]|[ㅏ-ㅣ]"
+    cdef str out_sentence = ""
+
+    for c_idx in indices:
+        if c_idx == vocab.end_seq_index and strict:
+            break
+        elif c_idx == vocab.mask_index and strict:
+            break
+        elif c_idx == vocab.begin_seq_index and strict:
+            continue
+        
+        cur_c = vocab.lookup_index(c_idx)
+
+        한글여부 = re.match(hangeul_pattern, cur_c)
+
+        if cur_c == "<SEP>":
+            jamo_len = len(jamo_list)
+
+            if jamo_len >= 2 and jamo_len <= 3:
+                # 자모 2~3개로 구성된 일반적인 한글
+                out.append(jamo_to_hangeul(*jamo_list))
+                jamo_list.clear()
+            elif jamo_len > 0:
+                # 자모가 4개 이상으로 구성된 문자는 없다.
+                # 이런 문자가 나왔을 경우 오류이므로 특수 토큰으로 처리
+                out.append('<잘못된 시퀸스 {0}>'.format(jamo_list))
+        elif cur_c == "<SPC>":
+            # 공백 문자
+            out.append(' ')
+        elif 한글여부 is not None:
+            jamo_list.append(cur_c)
+        else:
+            out.append(cur_c)
+    
+    out_sentence = ''.join(out)
+
+    return out_sentence
+
+def batch_sentence_jamo(SequenceVocabulary source_vocab, SequenceVocabulary target_vocab, 
+                    np.ndarray x_sources, np.ndarray y_targets, np.ndarray preds, int batch_size):
+    cdef str source_sentence
+    cdef str true_sentence
+    cdef str pred_sentence
+    cdef np.ndarray pred_idx
+    cdef dict m = dict()
+    cdef list result_list = list()
+
+    for i in range(batch_size):
+        source_sentence = sentence_from_jamo_indices(x_sources[i], source_vocab)
+        true_sentence = sentence_from_jamo_indices(y_targets[i], target_vocab)
+        pred_idx = np.argmax(preds[i], axis=1)
+        pred_sentence = sentence_from_jamo_indices(pred_idx, target_vocab)
+    
+        m = {
+            "source": source_sentence,
+            "truth": true_sentence,
+            "pred": pred_sentence
+        }
+
+        result_list.append(m)
+
+    return result_list

@@ -8,6 +8,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 import os
+import platform
 import json
 import datetime
 import gc
@@ -106,7 +107,8 @@ def init_model_and_dataset_mt(args:Namespace) -> tuple:
                  target_vocab_size=len(vectorizer.target_vocab),
                  target_embedding_size=args.target_embedding_size, 
                  encoding_size=args.encoding_size,
-                 target_bos_index=vectorizer.target_vocab.begin_seq_index)
+                 target_bos_index=vectorizer.target_vocab.begin_seq_index,
+                 target_eos_index=vectorizer.target_vocab.end_seq_index)
 
     if args.reload_from_files and os.path.exists(args.model_state_file):
         model.load_state_dict(torch.load(args.model_state_file))
@@ -169,7 +171,12 @@ def train_mt_model(args, data_set, vectorizer, model):
                                 position=1, 
                                 leave=True)
 
-    opt_model = torch.compile(model)
+    is_linux = platform.system() == "Linux"
+    if  is_linux:
+        opt_model = torch.compile(model)
+        args.compiled = True
+    device = torch.device("cuda" if args.cuda else "cpu")
+    train_state = make_train_state(args)
 
     try:
         for epoch_index in range(args.num_epochs):
@@ -181,10 +188,13 @@ def train_mt_model(args, data_set, vectorizer, model):
             data_set.set_split('train')
             batch_generator = generate_nmt_batches(data_set, 
                                                 batch_size=args.batch_size, 
-                                                device=args.device)
+                                                device=device)
             running_loss = 0.0
             running_acc = 0.0
-            opt_model.train()
+            if is_linux:
+                opt_model.train()
+            else:
+                model.train()
             
             for batch_index, batch_dict in enumerate(batch_generator):
                 # 훈련 과정은 5단계로 이루어집니다
@@ -194,9 +204,14 @@ def train_mt_model(args, data_set, vectorizer, model):
                 optimizer.zero_grad()
 
                 # 단계 2. 출력을 계산합니다
-                y_pred = opt_model(batch_dict['x_source'], 
-                            batch_dict['x_source_length'], 
-                            batch_dict['x_target'])
+                if is_linux:
+                    y_pred = opt_model(batch_dict['x_source'], 
+                                batch_dict['x_source_length'], 
+                                batch_dict['x_target'])
+                else:
+                    y_pred = model(batch_dict['x_source'], 
+                                batch_dict['x_source_length'], 
+                                batch_dict['x_target'])
 
                 # 단계 3. 손실을 계산합니다
                 loss = sequence_loss(y_pred, batch_dict['y_target'], mask_index)
@@ -228,16 +243,24 @@ def train_mt_model(args, data_set, vectorizer, model):
             data_set.set_split('val')
             batch_generator = generate_nmt_batches(data_set, 
                                                 batch_size=args.batch_size, 
-                                                device=args.device)
+                                                device=device)
             running_loss = 0.
             running_acc = 0.
-            opt_model.eval()
+            if is_linux:
+                opt_model.eval()
+            else:
+                model.eval()
 
             for batch_index, batch_dict in enumerate(batch_generator):
                 # 단계 1. 출력을 계산합니다
-                y_pred = opt_model(batch_dict['x_source'], 
-                            batch_dict['x_source_length'], 
-                            batch_dict['x_target'])
+                if is_linux:
+                    y_pred = opt_model(batch_dict['x_source'], 
+                                batch_dict['x_source_length'], 
+                                batch_dict['x_target'])
+                else:
+                    y_pred = model(batch_dict['x_source'], 
+                                batch_dict['x_source_length'], 
+                                batch_dict['x_target'])
 
                 # 단계 2. 손실을 계산합니다
                 loss = sequence_loss(y_pred, batch_dict['y_target'], mask_index)
@@ -255,12 +278,16 @@ def train_mt_model(args, data_set, vectorizer, model):
             train_state['val_loss'].append(running_loss)
             train_state['val_acc'].append(running_acc)
 
-            train_state = update_train_state(args=args, model=model, 
-                                            train_state=train_state)
+            if is_linux:
+                train_state = update_train_state(args=args, model=opt_model, 
+                                                train_state=train_state)
+            else:
+                train_state = update_train_state(args=args, model=model, 
+                                                train_state=train_state)
             
             end_time = time.time()
 
-            #print(f"epoch 실행 시간: {end_time - start_time}")
+            print(f"epoch 실행 시간: {end_time - start_time}")
 
             scheduler.step(train_state['val_loss'][-1])
 
@@ -428,22 +455,23 @@ def save_train_result(train_state, file_path):
         fp.write(json.dumps(train_state))
 
 def mt_args():
-    return Namespace(dataset_csv="datas/output/jeonla_dialect_integration.csv",
+    return Namespace(dataset_csv="datas/jeonla_dialect_bpe_integration.csv",
                 vectorizer_file="vectorizer.json",
                 model_state_file="model.pth",
                 train_state_file="train_state.json",
-                save_dir="model_storage/dial-stan_2",
+                log_json_file="logs/train_at_{time}.json",
+                save_dir="model_storage/stan-JL_bpe",
                 reload_from_files=True,
                 expand_filepaths_to_save_dir=True,
                 cuda=True,
                 seed=1337,
                 learning_rate=5e-4,
-                batch_size=24,
+                batch_size=256,
                 num_epochs=50,
-                early_stopping_criteria=2,         
+                early_stopping_criteria=3,         
                 source_embedding_size=64, 
                 target_embedding_size=64,
-                encoding_size=64,
+                encoding_size=128,
                 catch_keyboard_interrupt=True)
 
 def tl_args():
@@ -464,7 +492,7 @@ def tl_args():
                 rnn_hidden_size=150)
 
 def main():
-    args = tl_args()
+    args = mt_args()
 
     # console argument 구성 및 받아오기
 
@@ -499,7 +527,7 @@ def main():
     handle_dirs(args.save_dir)
     handle_dirs('/'.join(args.log_json_file.split('/')[:-1]))
 
-    data_set, vectorizer, model = init_model_and_dataset_tl(args)
+    data_set, vectorizer, model = init_model_and_dataset_mt(args)
 
     #model_trace = torch.jit.load("model_storage\\labeling_model_3\\model_2023-05-19_15_58.pth", map_location=torch.device("cpu"))
     #model.load_state_dict(torch.load("model_storage\\labeling_model_4\\model_2023-05-19_16_30.pth"))
@@ -509,7 +537,7 @@ def main():
 
     model = model.to(device)
 
-    train_state = train_tl_model(args, data_set, vectorizer, model)
+    train_state = train_mt_model(args, data_set, vectorizer, model)
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M")
 

@@ -62,11 +62,11 @@ def merge_dataset_with_label(train_set_csv: str, test_set_csv: str, val_threshol
 if __name__ == "__main__":
     print("main")
     
-    df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(전라도)\\Training\\[라벨]전라도_학습데이터_1")
+    '''df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(전라도)\\Validation\\[라벨]전라도_학습데이터_2")
     print(df.head())
-    df.to_csv("datas/output/jeonla_dialect_data_age.csv")
+    df.to_csv("datas/output/jeonla_dialect_test_age.csv")'''
     
-    '''res_df = merge_dataset_with_label("datas/output/jeonla_dialect_data_processed_2.csv",
-                                      "datas/output/jeonla_dialect_test_processed_2.csv")
+    res_df = merge_dataset_with_label("datas/output/jeonla_dialect_data_bpe.csv",
+                                      "datas/output/jeonla_dialect_test_bpe.csv")
     
-    res_df.to_csv("datas/output/jeonla_dialect_integration.csv")'''
+    res_df.to_csv("datas/output/jeonla_dialect_bpe_integration.csv")

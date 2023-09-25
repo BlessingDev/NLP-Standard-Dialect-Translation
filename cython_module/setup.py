@@ -62,6 +62,8 @@ wrapper_ext = [
 extensions = [
     Extension("sentence", ["sentence.pyx"],
               include_dirs=[numpy.get_include()]),
+    Extension("cjamo", ["cjamo.pyx"],
+              extra_compile_args=["/utf-8"]),
     Extension("cvocabulary", ["cvocabulary.py"]),
     Extension("cmetric", ["cmetric.pyx"],
               include_dirs=[numpy.get_include()])

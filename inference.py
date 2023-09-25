@@ -8,86 +8,190 @@ import argparse
 import json
 import torch
 import tqdm.cli as tqdm
+from jamo import j2h
+import numpy as np
+import re
+from tokenizers import ByteLevelBPETokenizer
 import cython_module.cvocabulary as cvocabulary
+import cython_module.cjamo as cjamo
 import cython_module.sentence as sentence
 
+def init_dataset(args) -> tuple:
+    data_set = None
+
+    if os.path.exists(args["vectorizer_file"]):
+        # 체크포인트를 로드합니다.
+        data_set = NMTDataset.load_dataset_and_load_vectorizer(args["dataset_csv"],
+                                                            args["vectorizer_file"])
+    else:
+        # 데이터셋과 Vectorizer를 만듭니다.
+        data_set = NMTDataset.load_dataset_and_make_vectorizer(args["dataset_csv"])
+        data_set.save_vectorizer(args["vectorizer_file"])
+
+    vectorizer = data_set.get_vectorizer()
+    
+    return data_set, vectorizer
+
+def jamo_decode_sentence(indices, vocab, strict=True):
+    jamo_list = []
+    out = []
+
+    hangeul_pattern = "[ㄱ-ㅎ]|[ㅏ-ㅣ]"
+
+    for c_idx in indices:
+        if c_idx == vocab.end_seq_index and strict:
+            break
+        elif c_idx == vocab.mask_index and strict:
+            break
+        elif c_idx == vocab.begin_seq_index and strict:
+            continue
+        
+        cur_c = vocab.lookup_index(c_idx)
+
+        한글여부 = re.match(hangeul_pattern, cur_c)
+
+        if cur_c == "<SEP>":
+            jamo_len = len(jamo_list)
+
+            if jamo_len >= 2 and jamo_len <= 3:
+                # 자모 2~3개로 구성된 일반적인 한글
+                out.append(j2h(*jamo_list))
+                jamo_list.clear()
+            elif jamo_len > 0:
+                # 자모가 4개 이상으로 구성된 문자는 없다.
+                # 이런 문자가 나왔을 경우 오류이므로 특수 토큰으로 처리
+                out.append('<잘못된 시퀸스 {0}>'.format(jamo_list))
+        elif cur_c == "<SPC>":
+            # 공백 문자
+            out.append(' ')
+        elif 한글여부 is not None:
+            jamo_list.append(cur_c)
+        else:
+            out.append(cur_c)
+    
+    out_sentence = ''.join(out)
+
+    return out_sentence
+
+def jamo_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
+    result_list = []
+
+    for i in range(batch_size):
+        source_sentence = jamo_decode_sentence(x_sources[i], vocab_source)
+        target_sentence = jamo_decode_sentence(y_targets[i], vocab_target)
+        pred_idx = np.argmax(preds[i], axis=1)
+        pred_sentence = jamo_decode_sentence(pred_idx, vocab_target)
+    
+        m = {
+            "source": source_sentence,
+            "truth": target_sentence,
+            "pred": pred_sentence
+        }
+
+        result_list.append(m)
+
+    return result_list
+
+def idx_to_tokens(indices, vocab):
+    token_list = []
+
+    for idx in indices:
+        if idx == vocab.end_seq_index:
+            break
+        token_list.append(vocab.lookup_index(idx))
+    
+    return token_list
+
+def decode_bpe_tokens(indices, vocab, bpe_tokenizer):
+    token_list = idx_to_tokens(indices, vocab)
+
+    token_ids = [bpe_tokenizer.token_to_id(token) for token in token_list]
+    token_ids = [token for token in token_ids if token is not None]
+
+    deocded_sentence = bpe_tokenizer.decode(token_ids)
+
+    return deocded_sentence
+
+def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
+    result_list = []
+
+    bpe_tokenizer = ByteLevelBPETokenizer().from_file("datas/bpe_vocab.json", "datas/bpe_merges.txt")
+
+    for i in range(batch_size):
+        source_sentence = decode_bpe_tokens(x_sources[i], vocab_source, bpe_tokenizer)
+        target_sentence = decode_bpe_tokens(y_targets[i], vocab_target, bpe_tokenizer)
+        pred_idx = np.argmax(preds[i], axis=1)
+        pred_sentence = decode_bpe_tokens(pred_idx, vocab_target, bpe_tokenizer)
+    
+        m = {
+            "source": source_sentence,
+            "truth": target_sentence,
+            "pred": pred_sentence
+        }
+
+        result_list.append(m)
+
+    return result_list
+
+def token_decode_batch(cvocab_source, cvocab_target, x_sources, y_targets, preds, batch_size):
+    batch_sentence_result = sentence.batch_sentence_mt(cvocab_source, cvocab_target,
+                                                        x_sources, y_targets, preds,
+                                                        batch_size)
+    return batch_sentence_result
+    
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--model_dir",
+        "--train_result_path",
         type=str,
         required=True
-    )
-    parser.add_argument(
-        "--dataset_path",
-        type=str,
-        required=True
-    )
-    parser.add_argument(
-        "--model_state_file",
-        type=str,
-        default="model.pth"
-    )
-    parser.add_argument(
-        "--vectorizer_file",
-        type=str,
-        default="vectorizer.json"
     )
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=16
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cuda"
+        default=32
     )
 
     args = parser.parse_args()
-    #args = parser.parse_args(["--model_dir", "model_storage/dial-stan_2", "--dataset_path", "datas/output/jeonla_dialect_integration.csv", "--batch_size", "8"])
+    #args = parser.parse_args(["--train_result_path", "model_storage/stan-JL_bpe/logs/train_at_2023-09-24_07_23.json", "--batch_size", "8"])
 
+    
     if not torch.cuda.is_available():
         args.device = "cpu"
+    else:
+        args.device = "cuda"
 
     args.device = torch.device(args.device)
         
     print("{} device 사용".format(args.device))
 
-    # 모델 경로 편집
-    args.vectorizer_file = os.path.join(args.model_dir,
-                                        args.vectorizer_file)
+    train_result_dict = {}
+    with open(args.train_result_path, mode="r+", encoding="utf-8") as fp:
+        train_result_dict = json.loads(fp.read())
 
-    args.model_state_file = os.path.join(args.model_dir,
-                                        args.model_state_file)
+    set_seed_everywhere(train_result_dict["seed"], args.device == "cuda")
 
-    assert os.path.exists(args.vectorizer_file), "vectorizer 파일 찾을 수 없음"
-    assert os.path.exists(args.model_state_file), "model 파일 찾을 수 없음"
-    assert os.path.exists(args.dataset_path), "dataset 파일 찾을 수 없음"
-
-    set_seed_everywhere(default_args.seed, args.device == "cuda")
-
+    data_set, vectorizer = init_dataset(train_result_dict)
     
-        # 체크포인트를 로드합니다.
-    data_set = NMTDataset.load_dataset_and_load_vectorizer(args.dataset_path,
-                                                        args.vectorizer_file)
-    
-    vectorizer = data_set.get_vectorizer()
     mask_index = vectorizer.target_vocab.mask_index
     cvocab_target = cvocabulary.SequenceVocabulary.from_serializable(cvocabulary.SequenceVocabulary, vectorizer.target_vocab.to_serializable())
     cvocab_source = cvocabulary.SequenceVocabulary.from_serializable(cvocabulary.SequenceVocabulary, vectorizer.source_vocab.to_serializable())
 
-
+    max_gen_length = 60
     model = NMTModel(source_vocab_size=len(vectorizer.source_vocab), 
-                 source_embedding_size=default_args.source_embedding_size, 
+                 source_embedding_size=train_result_dict["source_embedding_size"], 
                  target_vocab_size=len(vectorizer.target_vocab),
-                 target_embedding_size=default_args.target_embedding_size, 
-                 encoding_size=default_args.encoding_size,
+                 target_embedding_size=train_result_dict["target_embedding_size"], 
+                 encoding_size=train_result_dict["encoding_size"],
                  target_bos_index=vectorizer.target_vocab.begin_seq_index,
                  target_eos_index=vectorizer.target_vocab.end_seq_index,
-                 max_gen_length=vectorizer.max_target_length + 1)
-    model.load_state_dict(torch.load(args.model_state_file))
+                 max_gen_length=max_gen_length)
+
+    if train_result_dict["compiled"]:
+        model = torch.compile(model)
+
+    model.load_state_dict(torch.load(train_result_dict["model_state_file"]))
 
     model = model.to(args.device)
     model.eval()
@@ -99,6 +203,8 @@ def main():
                         leave=True)
 
     running_acc = 0.0
+    vectorizer.max_source_length = 60
+    vectorizer.max_target_length = max_gen_length - 1
     batch_generator = generate_nmt_batches(data_set, 
                                         batch_size=args.batch_size, 
                                         device=args.device)
@@ -115,7 +221,7 @@ def main():
             x_sources = batch_dict["x_source"].cpu().data.numpy()
             y_targets = batch_dict["y_target"].cpu().data.numpy()
             preds = y_pred.cpu().data.numpy()
-            batch_sentence_result = sentence.batch_sentence_mt(cvocab_source, cvocab_target,
+            batch_sentence_result = bpe_decode_batch(cvocab_source, cvocab_target,
                                                             x_sources, y_targets, preds,
                                                             args.batch_size)
             results.extend(batch_sentence_result)
@@ -126,19 +232,19 @@ def main():
         
         bleu = compute_bleu_score([row["pred"] for row in results], [row["truth"] for row in results])
         eval_dict = {"acc.": running_acc, "bleu": bleu}
-        with open(os.path.join(args.model_dir, "evaluation.json"), mode="w+", encoding="utf-8") as fp:
+        with open(os.path.join(train_result_dict["save_dir"], "evaluation.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(eval_dict))
         
-        with open(os.path.join(args.model_dir, "prediction.json"), mode="w+", encoding="utf-8") as fp:
+        with open(os.path.join(train_result_dict["save_dir"], "prediction.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(results))
     
     except KeyboardInterrupt:
         bleu = compute_bleu_score([row["pred"] for row in results], [row["truth"] for row in results])
         eval_dict = {"acc.": running_acc, "bleu": bleu}
-        with open(os.path.join(args.model_dir, "evaluation.json"), mode="w+", encoding="utf-8") as fp:
+        with open(os.path.join(train_result_dict["save_dir"], "evaluation.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(eval_dict))
         
-        with open(os.path.join(args.model_dir, "prediction.json"), mode="w+", encoding="utf-8") as fp:
+        with open(os.path.join(train_result_dict["save_dir"], "prediction.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(results))
         print("반복 중지")
 
