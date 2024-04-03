@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import pathlib
 import os
+import random
 
 def dialect_json_to_df(dir_path):
     dir = pathlib.Path(dir_path)
@@ -59,8 +60,12 @@ def merge_dataset_with_label(train_set_csv: str, test_set_csv: str, val_threshol
 
     return res_df
 
+def set_random_seed(seed):
+    random.seed(seed)
+
 if __name__ == "__main__":
     print("main")
+    set_random_seed(19439)
     
     '''df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(전라도)\\Validation\\[라벨]전라도_학습데이터_2")
     print(df.head())

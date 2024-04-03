@@ -153,8 +153,8 @@ def main():
         default=32
     )
 
-    args = parser.parse_args()
-    #args = parser.parse_args(["--train_result_path", "model_storage/stan-JL_bpe/logs/train_at_2023-09-24_07_23.json", "--batch_size", "8"])
+    #args = parser.parse_args()
+    args = parser.parse_args(["--train_result_path", "model_storage\\dial-stan_2\\train_state.json", "--batch_size", "8"])
 
     
     if not torch.cuda.is_available():
