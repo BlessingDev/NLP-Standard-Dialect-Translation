@@ -23,7 +23,11 @@ def dialect_json_to_df(dir_path):
             file_path = os.path.join(dir_path, file_name)
             json_file = open(file_path, mode="rt", encoding="utf-8-sig")
             json_text = json_file.read().strip()
-            data_json = json.loads(json_text)
+            try:
+                data_json = json.loads(json_text)
+            except:
+                print("error occured at {0}".format(file_name))
+                continue
             speaker_dic = {speaker["id"] : speaker for speaker in data_json["speaker"]}
 
             data_list = data_json["utterance"]
@@ -67,11 +71,11 @@ if __name__ == "__main__":
     print("main")
     set_random_seed(19439)
     
-    '''df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(전라도)\\Validation\\[라벨]전라도_학습데이터_2")
+    df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(충청도)\\Training\\[라벨]충청도_학습데이터_1")
     print(df.head())
-    df.to_csv("datas/output/jeonla_dialect_test_age.csv")'''
+    df.to_csv("datas/output/chungcheong_dialect_train_age.csv")
     
-    res_df = merge_dataset_with_label("datas/output/jeonla_dialect_data_bpe.csv",
+    '''res_df = merge_dataset_with_label("datas/output/jeonla_dialect_data_bpe.csv",
                                       "datas/output/jeonla_dialect_test_bpe.csv")
     
-    res_df.to_csv("datas/output/jeonla_dialect_bpe_integration.csv")
+    res_df.to_csv("datas/output/jeonla_dialect_bpe_integration.csv")'''
