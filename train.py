@@ -11,9 +11,12 @@ import os
 import platform
 import json
 import datetime
-import gc
 import time
 import tqdm.cli as tqdm
+
+# gpu 번호 지정
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 
 def set_seed_everywhere(seed, cuda):
     np.random.seed(seed)
@@ -67,20 +70,25 @@ def update_train_state(args, model, train_state):
     # 성능이 향상되면 모델을 저장합니다
     elif train_state['epoch_index'] >= 1:
         loss_tm1, loss_t = train_state['val_loss'][-2:]
+        loss_tolerance = 0.001
          
         # 손실이 나빠지면
-        if loss_t >= loss_tm1:
+        if loss_t >= loss_tm1 - loss_tolerance:
             # 조기 종료 단계 업데이트
             train_state['early_stopping_step'] += 1
+            print()
+            print("early stopping step: {0}".format(train_state['early_stopping_step']))
+            print()
         # 손실이 감소하면
         else:
-            # 최상의 모델 저장
-            if loss_t < train_state['early_stopping_best_val']:
-                torch.save(model.state_dict(), train_state['model_filename'])
-                train_state['early_stopping_best_val'] = loss_t
-
             # 조기 종료 단계 재설정
             train_state['early_stopping_step'] = 0
+        
+        # 최상의 모델 저장
+        if loss_t < train_state['early_stopping_best_val']:
+            torch.save(model.state_dict(), train_state['model_filename'])
+            train_state['early_stopping_best_val'] = loss_t
+
 
         # 조기 종료 여부 확인
         train_state['stop_early'] = \
@@ -161,12 +169,12 @@ def train_mt_model(args, data_set, vectorizer, model):
                                 position=0)
 
     data_set.set_split('train')
-    train_bar = tqdm.tqdm(desc='split=train',
+    train_bar = tqdm.tqdm(desc='train',
                                 total=data_set.get_num_batches(args.batch_size), 
                                 position=1, 
                                 leave=True)
     data_set.set_split('val')
-    val_bar = tqdm.tqdm(desc='split=val',
+    val_bar = tqdm.tqdm(desc='val',
                                 total=data_set.get_num_batches(args.batch_size), 
                                 position=1, 
                                 leave=True)
@@ -230,8 +238,7 @@ def train_mt_model(args, data_set, vectorizer, model):
                 running_acc += (acc_t - running_acc) / (batch_index + 1)
                 
                 # 진행 상태 막대 업데이트
-                train_bar.set_postfix(loss=running_loss, acc=running_acc, 
-                                epoch=epoch_index)
+                train_bar.set_postfix(loss=running_loss, acc=running_acc)
                 train_bar.update()
 
             train_state['train_loss'].append(running_loss)
@@ -271,8 +278,7 @@ def train_mt_model(args, data_set, vectorizer, model):
                 running_acc += (acc_t - running_acc) / (batch_index + 1)
                 
                 # 진행 상태 막대 업데이트
-                val_bar.set_postfix(loss=running_loss, acc=running_acc, 
-                                epoch=epoch_index)
+                val_bar.set_postfix(loss=running_loss, acc=running_acc)
                 val_bar.update()
 
             train_state['val_loss'].append(running_loss)
@@ -322,12 +328,12 @@ def train_tl_model(args, data_set, vectorizer, model):
                                 position=0)
 
     data_set.set_split('train')
-    train_bar = tqdm.tqdm(desc='split=train',
+    train_bar = tqdm.tqdm(desc='train',
                                 total=data_set.get_num_batches(args.batch_size), 
                                 position=1, 
                                 leave=True)
     data_set.set_split('val')
-    val_bar = tqdm.tqdm(desc='split=val',
+    val_bar = tqdm.tqdm(desc='val',
                                 total=data_set.get_num_batches(args.batch_size), 
                                 position=1, 
                                 leave=True)
@@ -384,8 +390,7 @@ def train_tl_model(args, data_set, vectorizer, model):
                 running_acc += (acc_t - running_acc) / (batch_index + 1)
                 
                 # 진행 상태 막대 업데이트
-                train_bar.set_postfix(loss=running_loss, acc=running_acc, 
-                                epoch=epoch_index)
+                train_bar.set_postfix(loss=running_loss, acc=running_acc)
                 train_bar.update()
 
             train_state['train_loss'].append(running_loss)
@@ -455,19 +460,19 @@ def save_train_result(train_state, file_path):
         fp.write(json.dumps(train_state))
 
 def mt_args():
-    return Namespace(dataset_csv="datas/jeonla_dialect_bpe_integration.csv",
+    return Namespace(dataset_csv="datas/jeonla_dialect_형태소_integration.csv",
                 vectorizer_file="vectorizer.json",
                 model_state_file="model.pth",
                 train_state_file="train_state.json",
                 log_json_file="logs/train_at_{time}.json",
-                save_dir="model_storage/stan-JL_bpe",
+                save_dir="model_storage/stan-JL_형태소",
                 reload_from_files=True,
                 expand_filepaths_to_save_dir=True,
                 cuda=True,
                 seed=1337,
                 learning_rate=5e-4,
-                batch_size=256,
-                num_epochs=50,
+                batch_size=200,
+                num_epochs=100,
                 early_stopping_criteria=3,         
                 source_embedding_size=64, 
                 target_embedding_size=64,
