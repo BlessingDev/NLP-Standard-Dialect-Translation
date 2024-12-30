@@ -71,11 +71,11 @@ if __name__ == "__main__":
     print("main")
     set_random_seed(19439)
     
-    df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(충청도)\\Training\\[라벨]충청도_학습데이터_1")
+    '''df = dialect_json_to_df("D:\\Datas\\한국어 방언 발화(충청도)\\Training\\[라벨]충청도_학습데이터_1")
     print(df.head())
-    df.to_csv("datas/output/chungcheong_dialect_train_age.csv")
+    df.to_csv("datas/output/chungcheong_dialect_train_age.csv")'''
     
-    '''res_df = merge_dataset_with_label("datas/output/jeonla_dialect_data_bpe.csv",
-                                      "datas/output/jeonla_dialect_test_bpe.csv")
+    res_df = merge_dataset_with_label("datas/output/chungcheong_dialect_data_bpe.csv",
+                                      "datas/output/chungcheong_dialect_test_bpe.csv")
     
-    res_df.to_csv("datas/output/jeonla_dialect_bpe_integration.csv")'''
+    res_df.to_csv("datas/output/chungcheong_dialect_bpe_integration.csv")

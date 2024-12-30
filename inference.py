@@ -1,6 +1,6 @@
 from dataset import NMTDataset, generate_nmt_batches
 from translate_model import NMTModel
-from utils import default_args, set_seed_everywhere
+from utils import set_seed_everywhere
 from metric import compute_accuracy_mt, compute_bleu_score
 
 import os
@@ -12,9 +12,13 @@ from jamo import j2h
 import numpy as np
 import re
 from tokenizers import ByteLevelBPETokenizer
+import sentencepiece as spm
 import cython_module.cvocabulary as cvocabulary
 import cython_module.cjamo as cjamo
 import cython_module.sentence as sentence
+
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def init_dataset(args) -> tuple:
     data_set = None
@@ -55,12 +59,18 @@ def jamo_decode_sentence(indices, vocab, strict=True):
 
             if jamo_len >= 2 and jamo_len <= 3:
                 # 자모 2~3개로 구성된 일반적인 한글
-                out.append(j2h(*jamo_list))
+                try:
+                    out.append(j2h(*jamo_list))
+                except:
+                    # 자모 디코딩 과정에서 에러가 생기면 자모를 조합할 수 없었다는 뜻
+                    out.extend(jamo_list)
+
                 jamo_list.clear()
             elif jamo_len > 0:
                 # 자모가 4개 이상으로 구성된 문자는 없다.
                 # 이런 문자가 나왔을 경우 오류이므로 특수 토큰으로 처리
-                out.append('<잘못된 시퀸스 {0}>'.format(jamo_list))
+                out.extend(jamo_list)
+                jamo_list.clear()
         elif cur_c == "<SPC>":
             # 공백 문자
             out.append(' ')
@@ -102,15 +112,23 @@ def idx_to_tokens(indices, vocab):
     
     return token_list
 
-def decode_bpe_tokens(indices, vocab, bpe_tokenizer):
+def decode_with_bpe(indices, vocab, tokenizer):
     token_list = idx_to_tokens(indices, vocab)
 
-    token_ids = [bpe_tokenizer.token_to_id(token) for token in token_list]
+    token_ids = [tokenizer.token_to_id(token) for token in token_list]
     token_ids = [token for token in token_ids if token is not None]
 
-    deocded_sentence = bpe_tokenizer.decode(token_ids)
+    deocded_sentence = tokenizer.decode(token_ids)
 
     return deocded_sentence
+
+def decode_with_sp(indices, vocab, tokenizer):
+    token_list = idx_to_tokens(indices, vocab)
+
+    decoded_sentence = tokenizer.decode(token_list)
+    decoded_sentence = decoded_sentence.replace("<UNK>", " <UNK>")
+
+    return decoded_sentence
 
 def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
     result_list = []
@@ -118,10 +136,10 @@ def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, ba
     bpe_tokenizer = ByteLevelBPETokenizer().from_file("datas/bpe_vocab.json", "datas/bpe_merges.txt")
 
     for i in range(batch_size):
-        source_sentence = decode_bpe_tokens(x_sources[i], vocab_source, bpe_tokenizer)
-        target_sentence = decode_bpe_tokens(y_targets[i], vocab_target, bpe_tokenizer)
+        source_sentence = decode_with_bpe(x_sources[i], vocab_source, bpe_tokenizer)
+        target_sentence = decode_with_bpe(y_targets[i], vocab_target, bpe_tokenizer)
         pred_idx = np.argmax(preds[i], axis=1)
-        pred_sentence = decode_bpe_tokens(pred_idx, vocab_target, bpe_tokenizer)
+        pred_sentence = decode_with_bpe(pred_idx, vocab_target, bpe_tokenizer)
     
         m = {
             "source": source_sentence,
@@ -133,7 +151,27 @@ def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, ba
 
     return result_list
 
-def token_decode_batch(cvocab_source, cvocab_target, x_sources, y_targets, preds, batch_size):
+def sentencepiece_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
+    result_list = []
+
+    sp_tokenizer = spm.SentencePieceProcessor(model_file='datas/sp_model.model')
+    for i in range(batch_size):
+        source_sentence = decode_with_sp(x_sources[i][1:], vocab_source, sp_tokenizer)
+        target_sentence = decode_with_sp(y_targets[i], vocab_target, sp_tokenizer)
+        pred_idx = np.argmax(preds[i], axis=1)
+        pred_sentence = decode_with_sp(pred_idx, vocab_target, sp_tokenizer)
+    
+        m = {
+            "source": source_sentence,
+            "truth": target_sentence,
+            "pred": pred_sentence
+        }
+
+        result_list.append(m)
+
+    return result_list
+
+def morph_decode_batch(cvocab_source, cvocab_target, x_sources, y_targets, preds, batch_size):
     batch_sentence_result = sentence.batch_sentence_mt(cvocab_source, cvocab_target,
                                                         x_sources, y_targets, preds,
                                                         batch_size)
@@ -153,8 +191,8 @@ def main():
         default=32
     )
 
-    #args = parser.parse_args()
-    args = parser.parse_args(["--train_result_path", "model_storage\\dial-stan_2\\train_state.json", "--batch_size", "8"])
+    args = parser.parse_args()
+    #args = parser.parse_args(["--train_result_path", "model_storage/stan-JJ_jamo/logs/train_at_2024-04-13_08_26.json", "--batch_size", "256"])
 
     
     if not torch.cuda.is_available():
@@ -186,7 +224,7 @@ def main():
                  encoding_size=train_result_dict["encoding_size"],
                  target_bos_index=vectorizer.target_vocab.begin_seq_index,
                  target_eos_index=vectorizer.target_vocab.end_seq_index,
-                 max_gen_length=max_gen_length)
+                 max_gen_length=vectorizer.max_target_length + 1)
 
     if train_result_dict["compiled"]:
         model = torch.compile(model)
@@ -203,8 +241,8 @@ def main():
                         leave=True)
 
     running_acc = 0.0
-    vectorizer.max_source_length = 60
-    vectorizer.max_target_length = max_gen_length - 1
+    #vectorizer.max_source_length = 60
+    #vectorizer.max_target_length = max_gen_length - 1
     batch_generator = generate_nmt_batches(data_set, 
                                         batch_size=args.batch_size, 
                                         device=args.device)
@@ -221,7 +259,7 @@ def main():
             x_sources = batch_dict["x_source"].cpu().data.numpy()
             y_targets = batch_dict["y_target"].cpu().data.numpy()
             preds = y_pred.cpu().data.numpy()
-            batch_sentence_result = bpe_decode_batch(cvocab_source, cvocab_target,
+            batch_sentence_result = morph_decode_batch(cvocab_source, cvocab_target,
                                                             x_sources, y_targets, preds,
                                                             args.batch_size)
             results.extend(batch_sentence_result)
@@ -235,8 +273,8 @@ def main():
         with open(os.path.join(train_result_dict["save_dir"], "evaluation.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(eval_dict))
         
-        with open(os.path.join(train_result_dict["save_dir"], "prediction.json"), mode="w+", encoding="utf-8") as fp:
-            fp.write(json.dumps(results))
+        with open(os.path.join(train_result_dict["save_dir"], "prediction.json"), mode="w+", encoding="utf-16") as fp:
+            fp.write(json.dumps(results, ensure_ascii=False))
     
     except KeyboardInterrupt:
         bleu = compute_bleu_score([row["pred"] for row in results], [row["truth"] for row in results])
@@ -244,8 +282,8 @@ def main():
         with open(os.path.join(train_result_dict["save_dir"], "evaluation.json"), mode="w+", encoding="utf-8") as fp:
             fp.write(json.dumps(eval_dict))
         
-        with open(os.path.join(train_result_dict["save_dir"], "prediction.json"), mode="w+", encoding="utf-8") as fp:
-            fp.write(json.dumps(results))
+        with open(os.path.join(train_result_dict["save_dir"], "prediction.json"), mode="w+", encoding="utf-16") as fp:
+            fp.write(json.dumps(results, ensure_ascii=False))
         print("반복 중지")
 
 
