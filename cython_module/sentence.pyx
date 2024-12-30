@@ -89,6 +89,23 @@ cdef string c_sentence_from_indices(vector[int] indices, SequenceVocabulary voca
     
     return out_sentence
 
+cdef list c_batch_sentence_to_result_dict(list sentence_lists, list keys, int batch_size):
+    cdef dict t_dict
+    cdef list out_list
+    cdef int key_num
+
+    out_list = list()
+    key_num = len(keys)
+    for i in range(batch_size):
+        t_dict = dict()
+        for j in range(key_num):
+            t_dict[keys[j]] = sentence_lists[j][i]
+        
+        out_list.append(t_dict)
+    
+    return out_list
+
+
 def batch_sentence_mt(SequenceVocabulary source_vocab, SequenceVocabulary target_vocab, 
                     np.ndarray x_sources, np.ndarray y_targets, np.ndarray preds, int batch_size):
     return c_batch_sentence_mt(source_vocab, target_vocab, x_sources, y_targets, preds, batch_size)
@@ -172,3 +189,6 @@ def batch_sentence_jamo(SequenceVocabulary source_vocab, SequenceVocabulary targ
         result_list.append(m)
 
     return result_list
+
+def batch_sentence_to_result_dict(list sentence_lists, list keys, int batch_size):
+    return c_batch_sentence_to_result_dict(sentence_lists, keys, batch_size)

@@ -3,10 +3,10 @@ from torch.nn import functional as F
 
 import torch
 import torch.nn as nn
-
+from minGRU_pytorch import minGRU
 
 class NMTEncoder(nn.Module):
-    def __init__(self, num_embeddings, embedding_size, rnn_hidden_size):
+    def __init__(self, num_embeddings, embedding_size, rnn_hidden_size, rnn_layers=3):
         """
         매개변수:
             num_embeddings (int): 임베딩 개수는 소스 어휘 사전의 크기입니다
@@ -16,7 +16,22 @@ class NMTEncoder(nn.Module):
         super(NMTEncoder, self).__init__()
     
         self.source_embedding = nn.Embedding(num_embeddings, embedding_size, padding_idx=0)
-        self.birnn = nn.GRU(embedding_size, rnn_hidden_size, bidirectional=True, batch_first=True)
+        
+        self.embed_to_rnn = nn.Linear(embedding_size, rnn_hidden_size)
+        
+        self.multi_rnn = nn.ModuleList()
+        self.reverse_rnn = nn.ModuleList()
+        
+        # 양방향 RNN은 포기...
+        for i in range(rnn_layers):
+            self.multi_rnn.append(minGRU(dim=rnn_hidden_size, expansion_factor=2))
+        
+        for i in range(rnn_layers):
+            self.reverse_rnn.append(minGRU(dim=rnn_hidden_size, expansion_factor=2))
+        
+        self.rnn_layers = rnn_layers
+        
+        self.rnn_hidden_size = rnn_hidden_size
     
     def forward(self, x_source, x_lengths):
         """ 모델의 정방향 계산
@@ -30,24 +45,45 @@ class NMTEncoder(nn.Module):
                 x_unpacked.shape = (batch, seq_size, rnn_hidden_size * 2)
                 x_birnn_h.shape = (batch, rnn_hidden_size * 2)
         """
+        batch_size = x_source.shape[0]
+        seq_length = x_source.shape[1]
+        
         x_embedded = self.source_embedding(x_source)
+        x_embedded = self.embed_to_rnn(x_embedded)
         # PackedSequence 생성; x_packed.data.shape=(number_items, embeddign_size)
-        x_packed = pack_padded_sequence(x_embedded, x_lengths.detach().cpu().numpy(), 
-                                        batch_first=True)
+        #x_packed = pack_padded_sequence(x_embedded, x_lengths.detach().cpu().numpy(), 
+        #                                batch_first=True)
         
         # x_birnn_h.shape = (num_rnn, batch_size, feature_size)
-        x_birnn_out, x_birnn_h  = self.birnn(x_packed)
-        # (batch_size, num_rnn, feature_size)로 변환
-        x_birnn_h = x_birnn_h.permute(1, 0, 2)
+        # x_birnn_out, x_birnn_h  = self.birnn(x_packed)
+        hidd_out = x_embedded
+        for i in range(self.rnn_layers):
+            hidd_out = self.multi_rnn[i](hidd_out)
         
-        # 특성 펼침; (batch_size, num_rnn * feature_size)로 바꾸기
-        # (참고: -1은 남은 차원에 해당합니다, 
-        #       두 개의 RNN 은닉 벡터를 1로 펼칩니다)
-        x_birnn_h = x_birnn_h.contiguous().view(x_birnn_h.size(0), -1)
+        rev_hidd_out = x_embedded
+        for i in range(self.rnn_layers):
+            rev_hidd_out = self.reverse_rnn[i](rev_hidd_out)
         
-        x_unpacked, _ = pad_packed_sequence(x_birnn_out, batch_first=True)
         
-        return x_unpacked, x_birnn_h
+        # output을 펴서 그 안에서 각 배치의 최종 seq hidden state를 뽑아낸다.
+        for i in range(batch_size):
+            cur_rev_hidden = rev_hidd_out[i, :x_lengths[i]]
+            cur_rev_hidden = torch.flip(cur_rev_hidden, dims=[0])
+            cur_rev_hidden = torch.cat([cur_rev_hidden, torch.zeros((seq_length - x_lengths[i], self.rnn_hidden_size)).to(cur_rev_hidden.device)])
+            
+            rev_hidd_out[i, :, :] = cur_rev_hidden
+            
+            x_lengths[i] = x_lengths[i] + i * seq_length
+        
+        # 양방향 통합
+        hidd_out = torch.cat([hidd_out, rev_hidd_out], dim=2)
+        
+        hidd_out_flat = hidd_out.reshape(-1, self.rnn_hidden_size * 2)
+        
+        seq_hidd_out = hidd_out_flat[x_lengths, :]
+        
+        # 각 문장의 마지막 은닉 상태와 전체 은닉 상태를 반환
+        return hidd_out, seq_hidd_out
 
 def verbose_attention(encoder_state_vectors, query_vector):
     """ 원소별 연산을 사용하는 어텐션 메커니즘 버전
@@ -154,7 +190,7 @@ class NMTDecoder(nn.Module):
             self._cached_ht.append(h_t.cpu().detach().numpy())
             
             # 단계 3: 현재 은닉 상태를 사용해 인코더의 상태를 주목합니다
-            context_vectors, p_attn, _ = verbose_attention(encoder_state_vectors=encoder_state, 
+            context_vectors, p_attn = terse_attention(encoder_state_vectors=encoder_state, 
                                                            query_vector=h_t)
             
             # 부가 작업: 시각화를 위해 어텐션 확률을 저장합니다
@@ -206,7 +242,7 @@ class NMTDecoder(nn.Module):
             self._cached_ht.append(h_t.cpu().detach().numpy())
             
             # 단계 3: 현재 은닉 상태를 사용해 인코더의 상태를 주목합니다
-            context_vectors, p_attn, _ = verbose_attention(encoder_state_vectors=encoder_state, 
+            context_vectors, p_attn = terse_attention(encoder_state_vectors=encoder_state, 
                                                            query_vector=h_t)
             
             # 부가 작업: 시각화를 위해 어텐션 확률을 저장합니다
@@ -265,7 +301,7 @@ class NMTModel(nn.Module):
             decoded_states (torch.Tensor): 각 출력 타임 스텝의 예측 벡터
         """
         encoder_state, final_hidden_states = self.encoder(x_source, x_source_lengths)
-        if target_sequence:
+        if target_sequence is not None:
             decoded_states = self.decoder(encoder_state=encoder_state, 
                                         initial_hidden_state=final_hidden_states, 
                                         target_sequence=target_sequence)
