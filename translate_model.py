@@ -104,11 +104,19 @@ def terse_attention(encoder_state_vectors, query_vector):
     """ 점곱을 사용하는 어텐션 메커니즘 버전
     
     매개변수:
-        encoder_state_vectors (torch.Tensor): 인코더의 양방향 GRU에서 출력된 3차원 텐서
-        query_vector (torch.Tensor): 디코더 GRU의 은닉 상태
+        encoder_state_vectors (torch.Tensor): 인코더의 양방향 GRU에서 출력된 3차원 텐서 (batch_size, sequence_length, encoder_hidden * 2)
+        query_vector (torch.Tensor): 디코더 GRU의 은닉 상태 (batch_size, decoder_hidden)
     """
-    vector_scores = torch.matmul(encoder_state_vectors, query_vector.unsqueeze(dim=2)).squeeze()
+    # encoder_hidden * 2 = decoder_hidden이 되도록 설정
+    # matmul에서 3D 텐서 간 곱셈은 batched matrix의 곱으로 계산
+    # 즉, (seq_length, encoder_hidden * 2) * (decoder_hidden, 1)인 행렬곱을 batch_size만큼 수행하는 것
+    # 따라서 위 행렬 곱의 결과는 (seq_length, 1), 여기에 squeeze 연산을 했으니 (seq_length)만 남음
+    # (batch_size, seq_length, encoder_hidden * 2) * (batch_size, decoder_hidden, 1) 
+    # = (batch_size, seq_length)
+    vector_scores = torch.matmul(encoder_state_vectors, query_vector.unsqueeze(dim=2)).squeeze() 
     vector_probabilities = F.softmax(vector_scores, dim=-1)
+    # (batch_size, encoder_hidden * 2, seq_length) * (batch_size, seq_length, 1)
+    # = (batch_size, decoder_hidden)
     context_vectors = torch.matmul(encoder_state_vectors.transpose(-2, -1), 
                                    vector_probabilities.unsqueeze(dim=2)).squeeze()
     return context_vectors, vector_probabilities
@@ -182,22 +190,22 @@ class NMTDecoder(nn.Module):
             y_t_index = target_sequence[i]
                 
             # 단계 1: 단어를 임베딩하고 이전 문맥과 연결합니다
-            y_input_vector = self.target_embedding(y_t_index)
-            rnn_input = torch.cat([y_input_vector, context_vectors], dim=1)
+            y_input_vector = self.target_embedding(y_t_index) # (batch_size, embedding_size)
+            rnn_input = torch.cat([y_input_vector, context_vectors], dim=1) # (batch_size, embedding_size + encoder_hidden * 2)
             
             # 단계 2: GRU를 적용하고 새로운 은닉 벡터를 얻습니다
-            h_t = self.gru_cell(rnn_input, h_t)
+            h_t = self.gru_cell(rnn_input, h_t) # (batch_size, decoder_hidden_size)
             self._cached_ht.append(h_t.cpu().detach().numpy())
             
             # 단계 3: 현재 은닉 상태를 사용해 인코더의 상태를 주목합니다
             context_vectors, p_attn = terse_attention(encoder_state_vectors=encoder_state, 
-                                                           query_vector=h_t)
+                                                           query_vector=h_t) # (batch_size, decoder_hidden)
             
             # 부가 작업: 시각화를 위해 어텐션 확률을 저장합니다
             self._cached_p_attn.append(p_attn.cpu().detach().numpy())
             
             # 단게 4: 현재 은닉 상태와 문맥 벡터를 사용해 다음 단어를 예측합니다
-            prediction_vector = torch.cat((context_vectors, h_t), dim=1)
+            prediction_vector = torch.cat((context_vectors, h_t), dim=1) # (batch_size, decoder_hidden * 2)
             score_for_y_t_index = self.classifier(F.dropout(prediction_vector, 0.3))
             
             # 부가 작업: 예측 성능 점수를 기록합니다
