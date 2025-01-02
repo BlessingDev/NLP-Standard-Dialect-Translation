@@ -49,7 +49,7 @@ std::string JamoToHangeul(std::string chosung, std::string jungsung, std::string
 
     char b[15];
 
-    sprintf_s(b, 15, "%ls", a);
+    snprintf(b, 15, "%ls", a);
 
     std::string result(b);
 
