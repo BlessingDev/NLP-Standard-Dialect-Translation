@@ -1,4 +1,3 @@
-# distutils: language = c++
 
 from libcpp.map cimport map
 from libcpp.string cimport string

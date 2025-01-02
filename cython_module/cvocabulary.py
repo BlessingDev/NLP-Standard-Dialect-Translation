@@ -1,4 +1,3 @@
-# distutils: language = c++
 
 class Vocabulary(object):
     """매핑을 위해 텍스트를 처리하고 어휘 사전을 만드는 클래스 """
