@@ -1,8 +1,6 @@
 import torch
 import numpy as np
 from argparse import Namespace
-import cython_module.cvocabulary
-import cython_module.sentence as sentence
 
 default_args = Namespace(
                 seed=1337,

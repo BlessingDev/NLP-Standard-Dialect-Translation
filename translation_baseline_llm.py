@@ -11,8 +11,8 @@ import numpy as np
 import re
 import sentencepiece as spm
 
-os.chdir("/workspace/NLP-Standard-Dialect-Transformation")
-sys.path.append("/workspace/NLP-Standard-Dialect-Transformation")
+#os.chdir("/workspace/NLP-Standard-Dialect-Transformation")
+#sys.path.append("/workspace/NLP-Standard-Dialect-Transformation")
 
 from dataset import NMTRawDataset, generate_raw_nmt_batches
 from utils import set_seed_everywhere
