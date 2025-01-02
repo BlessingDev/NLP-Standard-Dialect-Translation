@@ -117,7 +117,7 @@ class NMTVectorizer(object):
                 "source_length": len(source_indices)}
         
     @classmethod
-    def from_dataframe(cls, bitext_df):
+    def from_dataframe(cls, bitext_df, source_column, target_column):
         """ 데이터셋 데이터프레임으로 NMTVectorizer를 초기화합니다
         
         매개변수:
@@ -129,17 +129,17 @@ class NMTVectorizer(object):
         source_vocab = SequenceVocabulary()
         target_vocab = SequenceVocabulary()
         
-        max_source_length = 0
-        max_target_length = 0
-
+        max_source_length = 128
+        max_target_length = 128
+        
         for _, row in bitext_df.iterrows():
-            source_tokens = row["표준어"].split(" ")
+            source_tokens = row[source_column].split(" ")
             if len(source_tokens) > max_source_length:
                 max_source_length = len(source_tokens)
             for token in source_tokens:
                 source_vocab.add_token(token)
             
-            target_tokens = row["방언"].split(" ")
+            target_tokens = row[target_column].split(" ")
             if len(target_tokens) > max_target_length:
                 max_target_length = len(target_tokens)
             for token in target_tokens:

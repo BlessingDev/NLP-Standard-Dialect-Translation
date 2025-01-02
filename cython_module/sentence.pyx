@@ -192,3 +192,45 @@ def batch_sentence_jamo(SequenceVocabulary source_vocab, SequenceVocabulary targ
 
 def batch_sentence_to_result_dict(list sentence_lists, list keys, int batch_size):
     return c_batch_sentence_to_result_dict(sentence_lists, keys, batch_size)
+
+def batch_process_exa_output(list sta_sentence_list, list dia_sentence_list, int batch_size):
+    cdef str sta_target
+    cdef str dia_target
+
+    for idx in range(batch_size):
+        sta_target = sta_sentence_list[idx]
+        dia_target = dia_sentence_list[idx]
+
+        sta_target = sta_target.split('\n')[-1]
+        dia_target = dia_target.split('\n')[-1]
+        
+        sta_target = sta_target[13:]
+        dia_target = dia_target[13:]
+
+        sta_sentence_list[idx] = sta_target
+        dia_sentence_list[idx] = dia_target
+
+def batch_process_exa_templates(list sta_source_sentences, list dia_source_sentences, str prompt_template, int batch_size):
+    cdef list messages
+    cdef list sta_messages
+    cdef list dia_messages
+    cdef str prompt
+
+    sta_messages = list()
+    dia_messages = list()
+    messages = [
+        {"role": "system", 
+        "content": "You are EXAONE model from LG AI Research, a helpful assistant."},
+        {"role": "user", "content": ""}
+    ]
+
+    for idx in range(batch_size):
+        prompt = prompt_template.format(sta_source_sentences[idx])
+        messages[1]["content"] = prompt
+        sta_messages.append(messages)
+
+        prompt = prompt_template.format(dia_source_sentences[idx])
+        messages[1]["content"] = prompt
+        dia_messages.append(messages)
+    
+    return (sta_messages, dia_messages)
