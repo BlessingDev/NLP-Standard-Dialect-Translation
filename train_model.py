@@ -66,6 +66,7 @@ def update_train_state(args, model, train_state):
     if train_state['epoch_index'] == 0:
         torch.save(model.state_dict(), train_state['model_filename'])
         train_state['stop_early'] = False
+        train_state['early_stopping_best_val'] = train_state['val_loss'][-1]
 
     # 성능이 향상되면 모델을 저장합니다
     elif train_state['epoch_index'] >= 1:

@@ -18,7 +18,6 @@ import cython_module.cjamo as cjamo
 import cython_module.sentence as sentence
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def init_dataset(args) -> tuple:
     data_set = None
@@ -83,7 +82,7 @@ def jamo_decode_sentence(indices, vocab, strict=True):
 
     return out_sentence
 
-def jamo_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
+def jamo_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size, model_path_list):
     result_list = []
 
     for i in range(batch_size):
@@ -130,10 +129,11 @@ def decode_with_sp(indices, vocab, tokenizer):
 
     return decoded_sentence
 
-def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
+def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size, model_path_list):
     result_list = []
 
-    bpe_tokenizer = ByteLevelBPETokenizer().from_file("datas/bpe_vocab.json", "datas/bpe_merges.txt")
+    #bpe_tokenizer = ByteLevelBPETokenizer().from_file("datas/bpe_vocab.json", "datas/bpe_merges.txt")
+    bpe_tokenizer = ByteLevelBPETokenizer().from_file(model_path_list[0], model_path_list[1])
 
     for i in range(batch_size):
         source_sentence = decode_with_bpe(x_sources[i], vocab_source, bpe_tokenizer)
@@ -151,10 +151,10 @@ def bpe_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, ba
 
     return result_list
 
-def sentencepiece_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size):
+def sentencepiece_decode_batch(vocab_source, vocab_target, x_sources, y_targets, preds, batch_size, model_path_list):
     result_list = []
 
-    sp_tokenizer = spm.SentencePieceProcessor(model_file='datas/sp_model.model')
+    sp_tokenizer = spm.SentencePieceProcessor(model_file=model_path_list[0])
     for i in range(batch_size):
         source_sentence = decode_with_sp(x_sources[i][1:], vocab_source, sp_tokenizer)
         target_sentence = decode_with_sp(y_targets[i], vocab_target, sp_tokenizer)
@@ -171,7 +171,7 @@ def sentencepiece_decode_batch(vocab_source, vocab_target, x_sources, y_targets,
 
     return result_list
 
-def morph_decode_batch(cvocab_source, cvocab_target, x_sources, y_targets, preds, batch_size):
+def morph_decode_batch(cvocab_source, cvocab_target, x_sources, y_targets, preds, batch_size, model_path_list):
     batch_sentence_result = sentence.batch_sentence_mt(cvocab_source, cvocab_target,
                                                         x_sources, y_targets, preds,
                                                         batch_size)
@@ -190,10 +190,18 @@ def main():
         type=int,
         default=32
     )
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        default="0,1"
+    )
 
     args = parser.parse_args()
-    #args = parser.parse_args(["--train_result_path", "model_storage/stan-JJ_jamo/logs/train_at_2024-04-13_08_26.json", "--batch_size", "256"])
-
+    '''args = parser.parse_args(["--train_result_path", "/workspace/model_storage/dia_to_sta/chungcheong/jamo/logs/train_at_2025-01-01_05_49.json", "--batch_size", "32"])'''
+    
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+    
+    print(args.train_result_path)
     
     if not torch.cuda.is_available():
         args.device = "cpu"
@@ -209,6 +217,32 @@ def main():
         train_result_dict = json.loads(fp.read())
 
     set_seed_everywhere(train_result_dict["seed"], args.device == "cuda")
+    
+    region = ""
+    if "chungcheong" in args.train_result_path:
+        region = "chungcheong"
+    elif "gangwon" in args.train_result_path:
+        region = "gangwon"
+    elif "gyeongsang" in args.train_result_path:
+        region = "gyeongsang"
+    elif "jeju" in args.train_result_path:
+        region = "jeju"
+    elif "jeonla" in args.train_result_path:
+        region = "jeonla"
+    
+    tok_model_path_list = []
+    batch_decode_func = None
+    if "형태소" in args.train_result_path:
+        batch_decode_func = morph_decode_batch
+    elif "bpe" in args.train_result_path:
+        batch_decode_func = bpe_decode_batch
+        tok_model_path_list.append("/workspace/datas/{0}/vocab.json".format(region))
+        tok_model_path_list.append("/workspace/datas/{0}/merges.txt".format(region))
+    elif "jamo" in args.train_result_path:
+        batch_decode_func = jamo_decode_batch
+    elif "SentencePiece" in args.train_result_path:
+        batch_decode_func = sentencepiece_decode_batch
+        tok_model_path_list.append("/workspace/datas/{0}/{0}_sp.model".format(region))
 
     data_set, vectorizer = init_dataset(train_result_dict)
     
@@ -226,12 +260,12 @@ def main():
                  target_eos_index=vectorizer.target_vocab.end_seq_index,
                  max_gen_length=vectorizer.max_target_length + 1)
 
-    if train_result_dict["compiled"]:
-        model = torch.compile(model)
 
     model.load_state_dict(torch.load(train_result_dict["model_state_file"]))
 
+
     model = model.to(args.device)
+    #model = torch.compile(model)
     model.eval()
 
     data_set.set_split("test")
@@ -245,7 +279,9 @@ def main():
     #vectorizer.max_target_length = max_gen_length - 1
     batch_generator = generate_nmt_batches(data_set, 
                                         batch_size=args.batch_size, 
-                                        device=args.device)
+                                        device=args.device,
+                                        shuffle=False,
+                                        drop_last=False)
     results = []
     try:
         for batch_index, batch_dict in enumerate(batch_generator):
@@ -259,9 +295,9 @@ def main():
             x_sources = batch_dict["x_source"].cpu().data.numpy()
             y_targets = batch_dict["y_target"].cpu().data.numpy()
             preds = y_pred.cpu().data.numpy()
-            batch_sentence_result = morph_decode_batch(cvocab_source, cvocab_target,
+            batch_sentence_result = batch_decode_func(cvocab_source, cvocab_target,
                                                             x_sources, y_targets, preds,
-                                                            args.batch_size)
+                                                            args.batch_size, tok_model_path_list)
             results.extend(batch_sentence_result)
             
             # 진행 상태 막대 업데이트
