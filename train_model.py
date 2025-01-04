@@ -525,25 +525,7 @@ def mt_args():
         default=128
     )
     
-    return parser 
-    '''return Namespace(dataset_csv="datas/jeonla/jeonla_dialect_jamo_integration.csv",
-                vectorizer_file="vectorizer.json",
-                model_state_file="model.pth",
-                train_state_file="train_state.json",
-                log_json_file="logs/train_at_{time}.json",
-                save_dir="model_storage/test",
-                reload_from_files=True,
-                expand_filepaths_to_save_dir=True,
-                cuda=True,
-                seed=1337,
-                learning_rate=5e-4,
-                batch_size=200,
-                num_epochs=100,
-                early_stopping_criteria=3,         
-                source_embedding_size=64, 
-                target_embedding_size=64,
-                encoding_size=128,
-                catch_keyboard_interrupt=True)'''
+    return parser
     
     
 
@@ -567,11 +549,11 @@ def tl_args():
 def main():
     parser = mt_args()
     
-    args = parser.parse_args()
-    '''args = parser.parse_args([
-        "--dataset_csv", "/workspace/datas/jeonla/jeonla_dialect_jamo_integration.csv",
-        "--save_dir", "model_storage/test"
-    ])'''
+    #args = parser.parse_args()
+    args = parser.parse_args([
+        "--dataset_csv", "./datas/jeonla/jeonla_dialect_jamo_integration.csv",
+        "--save_dir", "./model_storage/test"
+    ])
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
     
