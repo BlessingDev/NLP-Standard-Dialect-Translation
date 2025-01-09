@@ -83,6 +83,11 @@ def main():
         default="0,1"
     )
     parser.add_argument(
+        "--target_lang",
+        type=str,
+        default="en"
+    )
+    parser.add_argument(
         "--batch_size",
         type=int,
         default=32
@@ -134,24 +139,14 @@ def main():
             sta_source_sentences = sp_tokenizer.Decode(batch_dict["standard"])
             dia_source_sentences = sp_tokenizer.Decode(batch_dict["dialect"])
             
-            sta_target_sentences = model.translate(sta_source_sentences, source_lang="ko", target_lang="en")
-            dia_target_sentences = model.translate(dia_source_sentences, source_lang="ko", target_lang="en")
+            sta_target_sentences = model.translate(sta_source_sentences, source_lang="ko", target_lang=args.target_lang)
+            dia_target_sentences = model.translate(dia_source_sentences, source_lang="ko", target_lang=args.target_lang)
             
             m = sentence.batch_sentence_to_result_dict(
                 [sta_source_sentences, sta_target_sentences, dia_source_sentences, dia_target_sentences],
                 ["standard_source", "standard_target", "dialect_source", "dialect_target"],
                 batch_size
             )
-            
-            '''m = [
-                {
-                    "standard_source": sta_source_sentences[i],
-                    "standard_target": sta_target_sentences[i],
-                    "dialect_source": dia_source_sentences[i],
-                    "dialect_target": dia_target_sentences[i]
-                }
-                for i in range(batch_size)
-            ]'''
             
             results.extend(m)
             
