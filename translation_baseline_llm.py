@@ -156,15 +156,16 @@ def main():
     batch_generator = generate_raw_nmt_batches(data_set, 
                                         batch_size=args.batch_size, 
                                         shuffle=False,
+                                        drop_last=False,
                                         device="cpu")
     results = []
     sp_tokenizer = spm.SentencePieceProcessor(model_file=args.sp_model)
     try:
         for batch_index, batch_dict in enumerate(batch_generator):
-            batch_size = len(batch_dict["standard"])
+            batch_size = len(batch_dict["target"])
             
-            sta_source_sentences = sp_tokenizer.Decode(batch_dict["standard"])
-            dia_source_sentences = sp_tokenizer.Decode(batch_dict["dialect"])
+            sta_source_sentences = sp_tokenizer.Decode(batch_dict["target"])
+            dia_source_sentences = sp_tokenizer.Decode(batch_dict["source"])
             
             sta_target_sentences = []
             dia_target_sentences = []

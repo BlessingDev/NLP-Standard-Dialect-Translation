@@ -120,6 +120,8 @@ def main():
         target_lang_prompt = "영어"
     elif args.target_lang == "jp":
         target_lang_prompt = "일본어"
+    elif args.target_lang == "zh":
+        target_lang_prompt = "중국어"
     else:
         print("invalid target language")
         target_lang_prompt = "영어"

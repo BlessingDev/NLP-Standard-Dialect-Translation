@@ -189,92 +189,10 @@ class NMTRawDataset(Dataset):
         source_tokens = source_tokens + [""] * (self.max_length - source_len)
         target_tokens = target_tokens + [""] * (self.max_length - target_len)
         
-        return {"standard": source_tokens, 
-                "standard_length": source_len,
-                "dialect": target_tokens,
-                "dialect_length": target_len
-                }
-        
-    def get_num_batches(self, batch_size):
-        """배치 크기가 주어지면 데이터셋으로 만들 수 있는 배치 개수를 반환합니다
-        
-        매개변수:
-            batch_size (int)
-        반환값:
-            배치 개수
-        """
-        return len(self) // batch_size
-
-class NMTRawDataset(Dataset):
-    """
-    벡터화된 임베딩을 반환하는 대신에 문장을 그대로 반환해주는 데이터셋
-    """
-    def __init__(self, text_df):
-        """
-        매개변수:
-            text_df (pandas.DataFrame): 데이터셋
-            vectorizer (SurnameVectorizer): 데이터셋에서 만든 Vectorizer 객체
-        """
-        self.text_df = text_df
-
-        self.train_df = self.text_df[self.text_df["셋"]=='train']
-        self.train_size = len(self.train_df)
-
-        self.val_df = self.text_df[self.text_df["셋"]=='val']
-        self.validation_size = len(self.val_df)
-
-        self.test_df = self.text_df[self.text_df["셋"]=='test']
-        self.test_size = len(self.test_df)
-
-        self._lookup_dict = {'train': (self.train_df, self.train_size),
-                             'val': (self.val_df, self.validation_size),
-                             'test': (self.test_df, self.test_size)}
-        
-        self.max_length = 256
-
-        self.set_split('train')
-
-    @classmethod
-    def load_dataset(cls, dataset_csv):
-        """데이터셋을 로드하고 새로운 Vectorizer를 만듭니다
-        
-        매개변수:
-            dataset_csv (str): 데이터셋의 위치
-        반환값:
-            NMTDataset의 객체
-        """
-        text_df = pd.read_csv(dataset_csv)
-        return cls(text_df)
-
-    def set_split(self, split="train"):
-        self._target_split = split
-        self._target_df, self._target_size = self._lookup_dict[split]
-
-    def __len__(self):
-        return self._target_size
-
-    def __getitem__(self, index):
-        """파이토치 데이터셋의 주요 진입 메서드
-        
-        매개변수:
-            index (int): 데이터 포인트에 대한 인덱스 
-        반환값:
-            데이터 포인트(x_source, x_target, y_target, x_source_length)를 담고 있는 딕셔너리
-        """
-        row = self._target_df.iloc[index]
-        
-        source_tokens = row[tl_source].split()
-        target_tokens = row[tl_target].split()
-        source_len = len(source_tokens)
-        target_len = len(target_tokens)
-        
-        source_tokens = source_tokens + [""] * (self.max_length - source_len)
-        target_tokens = target_tokens + [""] * (self.max_length - target_len)
-        
-        return {"standard": source_tokens, 
-                "standard_length": source_len,
-                "dialect": target_tokens,
-                "dialect_length": target_len
+        return {"source": source_tokens, 
+                "source_length": source_len,
+                "target": target_tokens,
+                "target_length": target_len
                 }
         
     def get_num_batches(self, batch_size):
