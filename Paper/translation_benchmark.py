@@ -6,13 +6,14 @@ from nltk.translate import bleu_score
 
 def bleu_between_sta_dia_eng(path_to_trans_result, output_file):
     regions = ["chungcheong", "gangwon", "gyeongsang", "jeju", "jeonla"]
-    models = ["opus-mt", "m2m_100_1.2B", "mbart50_m2en"]
+    models = ["opus-mt", "m2m_100_1.2B", "exaone"]
     
     eval_dict = dict()
     for r in regions:
         print(r)
         result_dict = dict()
         df_len = 0
+        # result_dict에 각 모델명을 key로 삼아 결과 DF 저장
         for m in models:
             json_list = []
             trans_file_path = os.path.join(path_to_trans_result, "{0}/{1}.json".format(r, m))
