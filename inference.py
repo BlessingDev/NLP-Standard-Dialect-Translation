@@ -261,7 +261,7 @@ def main():
                  max_gen_length=vectorizer.max_target_length + 1)
 
 
-    model.load_state_dict(torch.load(train_result_dict["model_state_file"]))
+    model.load_state_dict(torch.load(train_result_dict["model_state_file"], weights_only=False))
 
 
     model = model.to(args.device)
@@ -285,6 +285,7 @@ def main():
     results = []
     try:
         for batch_index, batch_dict in enumerate(batch_generator):
+            batch_size = batch_dict["x_source"].shape[0]
             y_pred = model(batch_dict['x_source'], 
                             batch_dict['x_source_length'])
 
@@ -297,7 +298,7 @@ def main():
             preds = y_pred.cpu().data.numpy()
             batch_sentence_result = batch_decode_func(cvocab_source, cvocab_target,
                                                             x_sources, y_targets, preds,
-                                                            args.batch_size, tok_model_path_list)
+                                                            batch_size, tok_model_path_list)
             results.extend(batch_sentence_result)
             
             # 진행 상태 막대 업데이트

@@ -1,6 +1,3 @@
-from easynmt import EasyNMT
-
-
 import os
 import sys
 import argparse
@@ -89,6 +86,11 @@ def main():
         default="0,1"
     )
     parser.add_argument(
+        "--target_lang",
+        type=str,
+        default="en"
+    )
+    parser.add_argument(
         "--batch_size",
         type=int,
         default=32
@@ -97,10 +99,10 @@ def main():
     args = parser.parse_args()
     
     '''args = parser.parse_args([
-        "--dataset_csv", "./datas/chungcheong/chungcheong_dialect_SentencePiece_integration.csv", 
-        "--sp_model", "./datas/chungcheong/chungcheong_sp.model",
-        "--output_path", "./translation_output/chungcheong/test.json",
-        "--batch_size", "4"
+        "--dataset_csv", "./datas/jeju/jeju_dialect_SentencePiece_integration.csv", 
+        "--sp_model", "./datas/jeju/jeju_sp.model",
+        "--output_path", "./translation_output/jeju/test.json",
+        "--batch_size", "32"
     ])'''
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
@@ -125,12 +127,25 @@ def main():
         trust_remote_code=True,
         device_map="auto"
     )
-    #model = torch.compile(model)
+    model = torch.compile(model)
     
     tokenizer = AutoTokenizer.from_pretrained("LGAI-EXAONE/EXAONE-3.0-7.8B-Instruct")
     tokenizer.padding_side = "left"
     
-    prompt_temp = "다음 문장을 영어로 번역해줘. 번역한 문장만 출력하도록 해: {0}."
+    target_lang_prompt = ""
+    if args.target_lang == "en":
+        target_lang_prompt = "영어"
+    elif args.target_lang == "jp":
+        target_lang_prompt = "일본어"
+    else:
+        print("invalid target language")
+        target_lang_prompt = "영어"
+        
+        
+    prompt_temp = "다음 문장을 {0}로 번역해줘. 번역한 문장만 출력하도록 해: ".format(target_lang_prompt)
+    prompt_temp = prompt_temp + "{0}."
+    
+    print(prompt_temp)
     
     data_set.set_split("test")
     test_bar = tqdm.tqdm(desc='split=test',
@@ -141,15 +156,16 @@ def main():
     batch_generator = generate_raw_nmt_batches(data_set, 
                                         batch_size=args.batch_size, 
                                         shuffle=False,
+                                        drop_last=False,
                                         device="cpu")
     results = []
     sp_tokenizer = spm.SentencePieceProcessor(model_file=args.sp_model)
     try:
         for batch_index, batch_dict in enumerate(batch_generator):
-            batch_size = len(batch_dict["standard"])
+            batch_size = len(batch_dict["target"])
             
-            sta_source_sentences = sp_tokenizer.Decode(batch_dict["standard"])
-            dia_source_sentences = sp_tokenizer.Decode(batch_dict["dialect"])
+            sta_source_sentences = sp_tokenizer.Decode(batch_dict["target"])
+            dia_source_sentences = sp_tokenizer.Decode(batch_dict["source"])
             
             sta_target_sentences = []
             dia_target_sentences = []
@@ -157,22 +173,13 @@ def main():
             sta_messages = []
             dia_messages = []
             tot_messages = []
-            for in_idx in range(batch_size):
-                prompt = prompt_temp.format(sta_source_sentences[in_idx])
-                messages = [
-                    {"role": "system", 
-                    "content": "You are EXAONE model from LG AI Research, a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-                sta_messages.append(messages)
-                
-                prompt = prompt_temp.format(dia_source_sentences[in_idx])
-                messages = [
-                    {"role": "system", 
-                    "content": "You are EXAONE model from LG AI Research, a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-                dia_messages.append(messages)
+            
+            sta_messages, dia_messages = sentence.batch_process_exa_templates(
+                sta_source_sentences,
+                dia_source_sentences,
+                prompt_temp,
+                batch_size
+            )
             
             tot_messages.extend(sta_messages)
             tot_messages.extend(dia_messages)
@@ -192,10 +199,10 @@ def main():
             )
             tot_sentences = tokenizer.batch_decode(output, skip_special_tokens=True)
             
+            sentence.batch_process_exa_output(tot_sentences, batch_size * 2)
+            
             sta_target_sentences = tot_sentences[:batch_size]
             dia_target_sentences = tot_sentences[batch_size:]
-            
-            sentence.batch_process_exa_output(sta_target_sentences, dia_target_sentences, batch_size)
             
             m = sentence.batch_sentence_to_result_dict(
                 [sta_source_sentences, sta_target_sentences, dia_source_sentences, dia_target_sentences],

@@ -189,10 +189,74 @@ class NMTRawDataset(Dataset):
         source_tokens = source_tokens + [""] * (self.max_length - source_len)
         target_tokens = target_tokens + [""] * (self.max_length - target_len)
         
-        return {"standard": source_tokens, 
-                "standard_length": source_len,
-                "dialect": target_tokens,
-                "dialect_length": target_len
+        return {"source": source_tokens, 
+                "source_length": source_len,
+                "target": target_tokens,
+                "target_length": target_len
+                }
+        
+    def get_num_batches(self, batch_size):
+        """배치 크기가 주어지면 데이터셋으로 만들 수 있는 배치 개수를 반환합니다
+        
+        매개변수:
+            batch_size (int)
+        반환값:
+            배치 개수
+        """
+        return len(self) // batch_size
+
+class NMTPredictionDataset(Dataset):
+    """
+    벡터화된 임베딩을 반환하는 대신에 문장을 그대로 반환해주는 데이터셋
+    """
+    def __init__(self, text_df):
+        """
+        매개변수:
+            text_df (pandas.DataFrame): 데이터셋
+            vectorizer (SurnameVectorizer): 데이터셋에서 만든 Vectorizer 객체
+        """
+        self.text_df = text_df
+        
+        self.max_length = 256
+
+        self._target_df, self._target_size = self.text_df, len(self.text_df)
+
+    @classmethod
+    def load_dataset(cls, prediction_json):
+        """데이터셋을 로드하고 새로운 Vectorizer를 만듭니다
+        
+        매개변수:
+            dataset_csv (str): 데이터셋의 위치
+        반환값:
+            NMTDataset의 객체
+        """
+        prediction_list = []
+        with open(prediction_json, mode="r+", encoding="utf-16") as fp:
+            prediction_list = json.loads(fp.read())
+        
+        text_df = pd.DataFrame(prediction_list)
+        return cls(text_df)
+
+    def __len__(self):
+        return self._target_size
+
+    def __getitem__(self, index):
+        """파이토치 데이터셋의 주요 진입 메서드
+        
+        매개변수:
+            index (int): 데이터 포인트에 대한 인덱스 
+        반환값:
+            데이터 포인트(x_source, x_target, y_target, x_source_length)를 담고 있는 딕셔너리
+        """
+        row = self._target_df.iloc[index]
+        
+        source_tokens = row["source"]
+        target_tokens = row["truth"]
+        prd_tokens = row["pred"]
+        
+        return {"source": source_tokens, 
+                "target": target_tokens,
+                "prediction": prd_tokens
                 }
         
     def get_num_batches(self, batch_size):
@@ -334,26 +398,23 @@ def generate_nmt_batches(dataset, batch_size, shuffle=True,
 
     for data_dict in dataloader:
         lengths = data_dict['x_source_length'].numpy()
-        sorted_length_indices = lengths.argsort()[::-1].tolist()
+        #pad packing 안 하니까 길이 정렬 필요 없음
+        #sorted_length_indices = lengths.argsort()[::-1].tolist()
         
         out_data_dict = {}
         for name, tensor in data_dict.items():
-            out_data_dict[name] = data_dict[name][sorted_length_indices].to(device)
+            out_data_dict[name] = data_dict[name].to(device)
         yield out_data_dict
 
 def raw_collate(x):
-    data_dict = {
-        "standard": [],
-        "standard_length": [],
-        "dialect": [],
-        "dialect_length": []
-    }
+    keys = x[0].keys()
+    data_dict = dict()
+    for k in keys:
+        data_dict[k] = list()
     
     for sample in x:
-        data_dict["standard"].append(sample["standard"])
-        data_dict["standard_length"].append(sample["standard_length"])
-        data_dict["dialect"].append(sample["dialect"])
-        data_dict["dialect_length"].append(sample["dialect_length"])
+        for k in keys:
+            data_dict[k].append(sample[k])
     
     return data_dict
 

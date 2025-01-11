@@ -75,12 +75,17 @@ def main():
     parser.add_argument(
         "--model_name",
         type=str,
-        default="mbart50_m2en"
+        default="m2m_100_1.2B"
     )
     parser.add_argument(
         "--gpus",
         type=str,
         default="0,1"
+    )
+    parser.add_argument(
+        "--target_lang",
+        type=str,
+        default="en"
     )
     parser.add_argument(
         "--batch_size",
@@ -90,9 +95,12 @@ def main():
 
     args = parser.parse_args()
     
-    '''args = parser.parse_args([
-        "--dataset_csv", "/workspace/datas/chungcheong/chungcheong_dialect_SentencePiece_integration.csv", 
-        "--sp_model", "/workspace/datas/chungcheong/chungcheong_sp.model",
+    '''region = "jeju"
+    args = parser.parse_args([
+        "--dataset_csv", "/workspace/datas/{0}/{0}_dialect_SentencePiece_integration.csv".format(region), 
+        "--sp_model", "/workspace/datas/{0}/{0}_sp.model".format(region),
+        "--model_name", "m2m_100_1.2B",
+        "--target_lang", "zh",
         "--output_path", "/workspace/translation_output/chungcheong/test.json",
         "--batch_size", "4"
     ])'''
@@ -124,34 +132,25 @@ def main():
     batch_generator = generate_raw_nmt_batches(data_set, 
                                         batch_size=args.batch_size, 
                                         shuffle=False,
+                                        drop_last=False,
                                         device="cpu")
     results = []
     sp_tokenizer = spm.SentencePieceProcessor(model_file=args.sp_model)
     try:
         for batch_index, batch_dict in enumerate(batch_generator):
-            batch_size = len(batch_dict["standard"])
+            batch_size = len(batch_dict["target"])
             
-            sta_source_sentences = sp_tokenizer.Decode(batch_dict["standard"])
-            dia_source_sentences = sp_tokenizer.Decode(batch_dict["dialect"])
+            sta_source_sentences = sp_tokenizer.Decode(batch_dict["target"])
+            dia_source_sentences = sp_tokenizer.Decode(batch_dict["source"])
             
-            sta_target_sentences = model.translate(sta_source_sentences, source_lang="ko", target_lang="en")
-            dia_target_sentences = model.translate(dia_source_sentences, source_lang="ko", target_lang="en")
+            sta_target_sentences = model.translate(sta_source_sentences, source_lang="ko", target_lang=args.target_lang)
+            dia_target_sentences = model.translate(dia_source_sentences, source_lang="ko", target_lang=args.target_lang)
             
             m = sentence.batch_sentence_to_result_dict(
                 [sta_source_sentences, sta_target_sentences, dia_source_sentences, dia_target_sentences],
                 ["standard_source", "standard_target", "dialect_source", "dialect_target"],
                 batch_size
             )
-            
-            '''m = [
-                {
-                    "standard_source": sta_source_sentences[i],
-                    "standard_target": sta_target_sentences[i],
-                    "dialect_source": dia_source_sentences[i],
-                    "dialect_target": dia_target_sentences[i]
-                }
-                for i in range(batch_size)
-            ]'''
             
             results.extend(m)
             

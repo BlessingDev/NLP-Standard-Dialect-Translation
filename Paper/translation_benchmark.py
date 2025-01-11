@@ -7,6 +7,7 @@ from nltk.translate import bleu_score
 def bleu_between_sta_dia_eng(path_to_trans_result, output_file):
     regions = ["chungcheong", "gangwon", "gyeongsang", "jeju", "jeonla"]
     models = ["opus-mt", "m2m_100_1.2B", "exaone"]
+    reference_models = ["exaone"]
     
     eval_dict = dict()
     for r in regions:
