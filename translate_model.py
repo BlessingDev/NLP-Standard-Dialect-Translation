@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from minGRU_pytorch import minGRU
 
-class NMTEncoder(nn.Module):
+class NMTminGRUEncoder(nn.Module):
     def __init__(self, num_embeddings, embedding_size, rnn_hidden_size, rnn_layers=3):
         """
         매개변수:
@@ -13,21 +13,22 @@ class NMTEncoder(nn.Module):
             embedding_size (int): 임베딩 벡터의 크기
             rnn_hidden_size (int): RNN 은닉 상태 벡터의 크기
         """
-        super(NMTEncoder, self).__init__()
+        super(NMTminGRUEncoder, self).__init__()
     
         self.source_embedding = nn.Embedding(num_embeddings, embedding_size, padding_idx=0)
         
         self.embed_to_rnn = nn.Linear(embedding_size, rnn_hidden_size)
         
-        self.multi_rnn = nn.ModuleList()
-        self.reverse_rnn = nn.ModuleList()
+        self.mingru = nn.Sequential()
+        self.reverse_mingru = nn.Sequential()
         
         # 양방향 RNN은 포기...
         for i in range(rnn_layers):
-            self.multi_rnn.append(minGRU(dim=rnn_hidden_size, expansion_factor=2))
+            self.mingru.add_module("gru_{0}".format(i), minGRU(dim=rnn_hidden_size, expansion_factor=2))
         
         for i in range(rnn_layers):
-            self.reverse_rnn.append(minGRU(dim=rnn_hidden_size, expansion_factor=2))
+            self.reverse_mingru.add_module("rev_gru_{0}".format(i), minGRU(dim=rnn_hidden_size, expansion_factor=2))
+        
         
         self.rnn_layers = rnn_layers
         
@@ -46,34 +47,56 @@ class NMTEncoder(nn.Module):
                 x_birnn_h.shape = (batch, rnn_hidden_size * 2)
         """
         batch_size = x_source.shape[0]
-        seq_length = x_source.shape[1]
+        #seq_length = x_source.shape[1]
+        seq_length = torch.max(x_lengths)
+        x_source = x_source[:, :seq_length]
+        #ori_lengths = x_lengths.detach().cpu().numpy()
+        
+        
+        
+        #start = torch.cuda.Event(enable_timing=True)
+        #end = torch.cuda.Event(enable_timing=True)
         
         x_embedded = self.source_embedding(x_source)
         x_embedded = self.embed_to_rnn(x_embedded)
         # PackedSequence 생성; x_packed.data.shape=(number_items, embeddign_size)
         #x_packed = pack_padded_sequence(x_embedded, x_lengths.detach().cpu().numpy(), 
         #                                batch_first=True)
+        rev_embedded = torch.flip(x_embedded, dims=[1])
+        # source 뒤집기
+        # 뒤집으면서 앞으로 오게 된 패딩을 정리하기
+        for i in range(batch_size):
+            padd_index = seq_length - x_lengths[i]
+            rev_embedded[i] = torch.cat([rev_embedded[i, padd_index:], rev_embedded[i, :padd_index]], dim=0)
+
+        
+        #torch.cuda.synchronize()
+        #rec_time = start.elapsed_time(end)
+        #print("embedding time: {0}".format(rec_time))
+
         
         # x_birnn_h.shape = (num_rnn, batch_size, feature_size)
         # x_birnn_out, x_birnn_h  = self.birnn(x_packed)
         hidd_out = x_embedded
-        for i in range(self.rnn_layers):
-            hidd_out = self.multi_rnn[i](hidd_out)
+        rev_hidd_out = rev_embedded
         
-        rev_hidd_out = x_embedded
-        for i in range(self.rnn_layers):
-            rev_hidd_out = self.reverse_rnn[i](rev_hidd_out)
+        hidd_out = self.mingru(hidd_out)
+        rev_hidd_out = self.reverse_mingru(rev_hidd_out)
         
         
         # output을 펴서 그 안에서 각 배치의 최종 seq hidden state를 뽑아낸다.
+        
+        rev_hidd_out = torch.flip(rev_hidd_out, dims=[1])
         for i in range(batch_size):
-            cur_rev_hidden = rev_hidd_out[i, :x_lengths[i]]
-            cur_rev_hidden = torch.flip(cur_rev_hidden, dims=[0])
-            cur_rev_hidden = torch.cat([cur_rev_hidden, torch.zeros((seq_length - x_lengths[i], self.rnn_hidden_size)).to(cur_rev_hidden.device)])
-            
-            rev_hidd_out[i, :, :] = cur_rev_hidden
-            
-            x_lengths[i] = x_lengths[i] + i * seq_length
+            padd_index = seq_length - x_lengths[i]
+            rev_hidd_out[i] = torch.cat([rev_hidd_out[i, padd_index:], rev_hidd_out[i, :padd_index]], dim=0)
+        
+        seq_vec = torch.full((batch_size, ), seq_length, device=x_lengths.device)
+        seq_vec[0] = 0
+        seq_vec = torch.cumsum(seq_vec, dim=0)
+        x_lengths = x_lengths + seq_vec - 1
+        
+        
         
         # 양방향 통합
         hidd_out = torch.cat([hidd_out, rev_hidd_out], dim=2)
@@ -82,8 +105,56 @@ class NMTEncoder(nn.Module):
         
         seq_hidd_out = hidd_out_flat[x_lengths, :]
         
+        
         # 각 문장의 마지막 은닉 상태와 전체 은닉 상태를 반환
         return hidd_out, seq_hidd_out
+
+class NMTEncoder(nn.Module):
+    def __init__(self, num_embeddings, embedding_size, rnn_hidden_size):
+        """
+        매개변수:
+            num_embeddings (int): 임베딩 개수는 소스 어휘 사전의 크기입니다
+            embedding_size (int): 임베딩 벡터의 크기
+            rnn_hidden_size (int): RNN 은닉 상태 벡터의 크기
+        """
+        super(NMTEncoder, self).__init__()
+    
+        self.source_embedding = nn.Embedding(num_embeddings, embedding_size, padding_idx=0)
+        self.birnn = nn.GRU(embedding_size, rnn_hidden_size, bidirectional=True, batch_first=True)
+    
+    def forward(self, x_source, x_lengths):
+        """ 모델의 정방향 계산
+        
+        매개변수:
+            x_source (torch.Tensor): 입력 데이터 텐서
+                x_source.shape는 (batch, seq_size)이다.
+            x_lengths (torch.Tensor): 배치에 있는 아이템의 길이 벡터
+        반환값:
+            튜플: x_unpacked (torch.Tensor), x_birnn_h (torch.Tensor)
+                x_unpacked.shape = (batch, seq_size, rnn_hidden_size * 2)
+                x_birnn_h.shape = (batch, rnn_hidden_size * 2)
+        """
+        seq_length = torch.max(x_lengths)
+        x_source = x_source[:, :seq_length]
+        
+        x_embedded = self.source_embedding(x_source)
+        # PackedSequence 생성; x_packed.data.shape=(number_items, embeddign_size)
+        #x_packed = pack_padded_sequence(x_embedded, x_lengths.detach().cpu().numpy(), batch_first=True)
+        
+        # x_birnn_h.shape = (num_rnn, batch_size, feature_size)
+        x_birnn_out, x_birnn_h  = self.birnn(x_embedded)
+        # (batch_size, num_rnn, feature_size)로 변환
+        
+        x_birnn_h = x_birnn_h.permute(1, 0, 2)
+        
+        # 특성 펼침; (batch_size, num_rnn * feature_size)로 바꾸기
+        # (참고: -1은 남은 차원에 해당합니다, 
+        #       두 개의 RNN 은닉 벡터를 1로 펼칩니다)
+        x_birnn_h = x_birnn_h.contiguous().view(x_birnn_h.size(0), -1)
+        
+        #x_unpacked, _ = pad_packed_sequence(x_birnn_out, batch_first=True)
+        
+        return x_birnn_out, x_birnn_h
 
 def verbose_attention(encoder_state_vectors, query_vector):
     """ 원소별 연산을 사용하는 어텐션 메커니즘 버전
@@ -104,19 +175,11 @@ def terse_attention(encoder_state_vectors, query_vector):
     """ 점곱을 사용하는 어텐션 메커니즘 버전
     
     매개변수:
-        encoder_state_vectors (torch.Tensor): 인코더의 양방향 GRU에서 출력된 3차원 텐서 (batch_size, sequence_length, encoder_hidden * 2)
-        query_vector (torch.Tensor): 디코더 GRU의 은닉 상태 (batch_size, decoder_hidden)
+        encoder_state_vectors (torch.Tensor): 인코더의 양방향 GRU에서 출력된 3차원 텐서
+        query_vector (torch.Tensor): 디코더 GRU의 은닉 상태
     """
-    # encoder_hidden * 2 = decoder_hidden이 되도록 설정
-    # matmul에서 3D 텐서 간 곱셈은 batched matrix의 곱으로 계산
-    # 즉, (seq_length, encoder_hidden * 2) * (decoder_hidden, 1)인 행렬곱을 batch_size만큼 수행하는 것
-    # 따라서 위 행렬 곱의 결과는 (seq_length, 1), 여기에 squeeze 연산을 했으니 (seq_length)만 남음
-    # (batch_size, seq_length, encoder_hidden * 2) * (batch_size, decoder_hidden, 1) 
-    # = (batch_size, seq_length)
-    vector_scores = torch.matmul(encoder_state_vectors, query_vector.unsqueeze(dim=2)).squeeze() 
+    vector_scores = torch.matmul(encoder_state_vectors, query_vector.unsqueeze(dim=2)).squeeze()
     vector_probabilities = F.softmax(vector_scores, dim=-1)
-    # (batch_size, encoder_hidden * 2, seq_length) * (batch_size, seq_length, 1)
-    # = (batch_size, decoder_hidden)
     context_vectors = torch.matmul(encoder_state_vectors.transpose(-2, -1), 
                                    vector_probabilities.unsqueeze(dim=2)).squeeze()
     return context_vectors, vector_probabilities
@@ -190,22 +253,22 @@ class NMTDecoder(nn.Module):
             y_t_index = target_sequence[i]
                 
             # 단계 1: 단어를 임베딩하고 이전 문맥과 연결합니다
-            y_input_vector = self.target_embedding(y_t_index) # (batch_size, embedding_size)
-            rnn_input = torch.cat([y_input_vector, context_vectors], dim=1) # (batch_size, embedding_size + encoder_hidden * 2)
+            y_input_vector = self.target_embedding(y_t_index)
+            rnn_input = torch.cat([y_input_vector, context_vectors], dim=1)
             
             # 단계 2: GRU를 적용하고 새로운 은닉 벡터를 얻습니다
-            h_t = self.gru_cell(rnn_input, h_t) # (batch_size, decoder_hidden_size)
+            h_t = self.gru_cell(rnn_input, h_t)
             self._cached_ht.append(h_t.cpu().detach().numpy())
             
             # 단계 3: 현재 은닉 상태를 사용해 인코더의 상태를 주목합니다
             context_vectors, p_attn = terse_attention(encoder_state_vectors=encoder_state, 
-                                                           query_vector=h_t) # (batch_size, decoder_hidden)
+                                                           query_vector=h_t)
             
             # 부가 작업: 시각화를 위해 어텐션 확률을 저장합니다
             self._cached_p_attn.append(p_attn.cpu().detach().numpy())
             
             # 단게 4: 현재 은닉 상태와 문맥 벡터를 사용해 다음 단어를 예측합니다
-            prediction_vector = torch.cat((context_vectors, h_t), dim=1) # (batch_size, decoder_hidden * 2)
+            prediction_vector = torch.cat((context_vectors, h_t), dim=1)
             score_for_y_t_index = self.classifier(F.dropout(prediction_vector, 0.3))
             
             # 부가 작업: 예측 성능 점수를 기록합니다

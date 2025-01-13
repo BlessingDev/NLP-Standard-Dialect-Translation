@@ -34,6 +34,7 @@ def make_train_state(args):
             'early_stopping_best_val': 1e8,
             'learning_rate': args.learning_rate,
             'epoch_index': 0,
+            "epoch_time": [],
             'train_loss': [],
             'train_acc': [],
             'val_loss': [],
@@ -191,7 +192,7 @@ def train_mt_model(args, data_set, vectorizer, model):
 
             # 훈련 세트와 배치 제너레이터 준비, 손실과 정확도를 0으로 설정
             data_set.set_split('train')
-            batch_generator = generate_nmt_batches(data_set, 
+            batch_generator = generate_nmt_sorted_batches(data_set, 
                                                 batch_size=args.batch_size, 
                                                 device=device)
             running_loss = 0.0
@@ -237,7 +238,7 @@ def train_mt_model(args, data_set, vectorizer, model):
 
             # 검증 세트와 배치 제너레이터 준비, 손실과 정확도를 0으로 설정
             data_set.set_split('val')
-            batch_generator = generate_nmt_batches(data_set, 
+            batch_generator = generate_nmt_sorted_batches(data_set, 
                                                 batch_size=args.batch_size, 
                                                 device=device)
             running_loss = 0.
@@ -270,7 +271,9 @@ def train_mt_model(args, data_set, vectorizer, model):
             
             end_time = time.time()
 
+            epoch_time = end_time - start_time
             print(f"epoch 실행 시간: {end_time - start_time}")
+            train_state["epoch_time"].append(epoch_time)
 
             scheduler.step(train_state['val_loss'][-1])
 
@@ -413,8 +416,10 @@ def train_tl_model(args, data_set, vectorizer, model):
             
             end_time = time.time()
 
+            epoch_time = end_time - start_time
             print(f"epoch 실행 시간: {end_time - start_time}")
-
+            train_state["epoch_time"].append(epoch_time)
+            
             scheduler.step(train_state['val_loss'][-1])
 
             if train_state['stop_early']:
@@ -507,7 +512,11 @@ def mt_args():
     parser.add_argument(
         "--early_stopping_criteria",
         type=int,
-        default=3
+        default=2
+    )
+    parser.add_argument(
+        "--use_mingru",
+        action="store_true"
     )
     parser.add_argument(
         "--source_embedding_size",
@@ -549,11 +558,14 @@ def tl_args():
 def main():
     parser = mt_args()
     
-    #args = parser.parse_args()
-    args = parser.parse_args([
-        "--dataset_csv", "./datas/jeonla/jeonla_dialect_jamo_integration.csv",
-        "--save_dir", "./model_storage/test"
-    ])
+    args = parser.parse_args()
+    
+    '''args = parser.parse_args([
+        "--dataset_csv", "/workspace/datas/jeju/jeju_dialect_jamo_integration.csv",
+        "--save_dir", "model_storage/test",
+        "--gpus", "1",
+        "--use_mingru"
+    ])'''
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
     
