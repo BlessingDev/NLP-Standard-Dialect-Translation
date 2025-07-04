@@ -1,8 +1,11 @@
 import torch
-
+import numpy as np
 from torch.nn import functional as F
 from nltk.translate import bleu_score
-#from sklearn.metrics import accuracy_score, f1_score
+
+import evaluate
+chrf = evaluate.load("chrf")
+bertscore = evaluate.load("bertscore")
 
 def normalize_sizes(y_pred, y_true):
     """텐서 크기 정규화
@@ -52,3 +55,21 @@ def compute_bleu_score(y_pred, y_true, weights=(0.25, 0.25, 0.25, 0.25)):
                                   hypotheses=y_pred, 
                                   weights=weights,
                                   smoothing_function=bleu_score.SmoothingFunction().method1)
+
+def compute_chrf_score(y_pred, y_true, char_order=6, word_order=2, beta=2):
+    result = chrf.compute(
+        predictions=y_pred,
+        references=[[ref] for ref in y_true],
+        char_order=char_order,
+        word_order=word_order,
+        beta=beta
+    )
+    
+    return result["score"]
+
+
+def compute_bert_score(y_pred, y_true, lang):
+    results = bertscore.compute(predictions=y_pred, references=y_true, lang=lang, batch_size=512)
+    
+    f1_arr = np.array(results["f1"])
+    return f1_arr.mean()
