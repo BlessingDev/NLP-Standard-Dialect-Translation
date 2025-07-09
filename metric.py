@@ -4,8 +4,8 @@ from torch.nn import functional as F
 from nltk.translate import bleu_score
 
 import evaluate
-chrf = evaluate.load("chrf")
-bertscore = evaluate.load("bertscore")
+chrf = evaluate.load(r"D:\evaluate-main\metrics\chrf\chrf.py")
+#bertscore = evaluate.load("bertscore")
 
 def normalize_sizes(y_pred, y_true):
     """텐서 크기 정규화
