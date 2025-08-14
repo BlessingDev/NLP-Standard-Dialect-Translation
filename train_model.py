@@ -183,6 +183,7 @@ def train_mt_model(args, data_set, vectorizer, model):
 
     device = torch.device("cuda" if args.cuda else "cpu")
     train_state = make_train_state(args)
+    max_norm = 1.0
 
     try:
         for epoch_index in range(args.num_epochs):
@@ -213,6 +214,9 @@ def train_mt_model(args, data_set, vectorizer, model):
 
                 # 단계 3. 손실을 계산합니다
                 loss = sequence_loss(y_pred, batch_dict['y_target'], mask_index)
+
+                # 그레이디언트 클리핑
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm)
 
                 # 단계 4. 손실을 사용해 그레이디언트를 계산합니다
                 loss.backward()
@@ -322,7 +326,8 @@ def train_tl_model(args, data_set, vectorizer, model):
     device = torch.device("cuda" if args.cuda else "cpu")
     class_weight = torch.FloatTensor([0.001, 0.999])
     class_weight = class_weight.to(device)
-
+    max_norm = 5.0
+    
     try:
         for epoch_index in range(args.num_epochs):
 
@@ -357,6 +362,9 @@ def train_tl_model(args, data_set, vectorizer, model):
                 # 단계 4. 손실을 사용해 그레이디언트를 계산합니다
                 loss.backward()
 
+                # 그레이디언트 클리핑
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm)
+                
                 # 단계 5. 옵티마이저로 가중치를 업데이트합니다
                 optimizer.step()
                 # -----------------------------------------
